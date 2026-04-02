@@ -1,0 +1,19 @@
+# Carpeta del sitio = raíz del repo (Limaje.html, manifest, assets, sw.js)
+[build]
+  publish = "."
+
+# Raíz = misma app (URL limpia / y PWA start_url compatible)
+[[redirects]]
+  from = "/"
+  to = "/Limaje.html"
+  status = 200
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
