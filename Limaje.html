@@ -290,7 +290,11 @@
 </head>
 <body>
 
-<!-- Supabase: pegue URL y anon key (Settings → API). La sesión usa solo memoria (sin localStorage); al recargar la página deberá iniciar sesión otra vez. -->
+<!--
+  Supabase (obligatorio antes de subir a Netlify):
+  1) Dashboard → Project Settings → API → copie "Project URL" y "anon public".
+  2) Péguelos entre comillas abajo (sin espacios de más).
+-->
 <script>
 window.LIMAJE_SUPABASE_URL = window.LIMAJE_SUPABASE_URL || '';
 window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
@@ -931,8 +935,15 @@ async function enterAppSessionOnce(session){
     if(prof&&!prof.intro_seen) showIntro(false);
   }catch(err){
     console.error(err);
-    alert2('Error al sincronizar: '+((err&&err.message)?err.message:String(err)),'error');
+    var msg=(err&&err.message)?err.message:String(err);
+    alert2('Error al sincronizar: '+msg,'error');
     _enteredUserId=null;
+    var ls=document.getElementById('loginScreen');
+    var ap=document.getElementById('app');
+    if(ls) ls.style.display='flex';
+    if(ap) ap.style.display='none';
+    var la=document.getElementById('loginAlert');
+    if(la) la.innerHTML='<div class="alert alert-error">No se pudo cargar la app (datos o perfil). Revise: 1) SQL <code>schema.sql</code> ejecutado en Supabase, 2) URL del sitio en Authentication → URL, 3) consola F12. Detalle: '+escapeHtmlLot(msg)+'</div>';
   }
 }
 function exitAppSessionUI(){
