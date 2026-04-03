@@ -309,9 +309,9 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     <div class="intro-title">Bienvenido</div>
     <div class="intro-text">Sistema de ventas, inventario, cartera y caja para Multi-cerámica LIMAJE. Registre ventas, controle stock, imprima recibos en ticket 57mm y gestione créditos.</div>
     <div class="intro-actions">
-      <button class="btn btn-full" onclick="hideIntro()">Continuar</button>
+      <button type="button" class="btn btn-full" onclick="hideIntro()">Continuar</button>
     </div>
-    <div class="intro-skip"><a onclick="hideIntro()">No mostrar de nuevo</a> — al continuar no se mostrará esta pantalla al abrir el programa.</div>
+    <div class="intro-skip"><a href="#" onclick="event.preventDefault();hideIntro();">No mostrar de nuevo</a> — al continuar no se mostrará esta pantalla al abrir el programa.</div>
   </div>
 </div>
 
@@ -326,8 +326,8 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     <div id="loginAlert"></div>
     <div class="form-group"><label>Correo electrónico</label><input type="email" id="loginUser" placeholder="ejemplo@correo.com" autocomplete="username"></div>
     <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button class="btn btn-full" onclick="doLogin()">Ingresar al Sistema</button>
-    <p style="text-align:center;margin-top:14px;"><a href="javascript:void(0)" onclick="showIntro(false)" style="font-size:12px;color:var(--text2);text-decoration:underline;">Ver introducción</a></p>
+    <button type="button" class="btn btn-full" onclick="void doLogin()">Ingresar al Sistema</button>
+    <p style="text-align:center;margin-top:14px;"><a href="#" onclick="event.preventDefault();showIntro(false);" style="font-size:12px;color:var(--text2);text-decoration:underline;cursor:pointer;">Ver introducción</a></p>
   </div>
 </div>
 
@@ -1214,9 +1214,13 @@ function hideIntro(){
 }
 
 async function doLogin(){
+  const el=document.getElementById('loginAlert');
+  if(!window.__limajeSupabase){
+    if(el) el.innerHTML='<div class="alert alert-error">Falta configurar Supabase: revise <code>limaje-config.js</code> (URL debe ser https://…supabase.co y la anon key completa). Recargue con Ctrl+F5.</div>';
+    return;
+  }
   const email=document.getElementById('loginUser').value.trim();
   const password=document.getElementById('loginPass').value;
-  const el=document.getElementById('loginAlert');
   if(!email||!password){
     if(el) el.innerHTML='<div class="alert alert-error">Ingrese correo y contraseña</div>';
     return;
