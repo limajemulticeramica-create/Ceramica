@@ -1,12 +1,11 @@
 {
-  "id": "/",
+  "id": "/Limaje.html",
   "name": "Multi-cerámica LIMAJE — Sistema de Gestión",
   "short_name": "LIMAJE",
-  "description": "Ventas, inventario, cartera y caja. Datos en la nube con Supabase, sincronización en tiempo real entre dispositivos.",
-  "start_url": "/",
+  "description": "Ventas, inventario, cartera y caja. Datos en la nube con Supabase.",
+  "start_url": "/Limaje.html",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "browser"],
   "orientation": "any",
   "background_color": "#1565c0",
   "theme_color": "#1b5e20",
@@ -15,19 +14,19 @@
   "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "assets/icon-192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/icon-512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/icon-512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

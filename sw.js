@@ -1,6 +1,6 @@
 /* LIMAJE — service worker mínimo para instalación PWA (Netlify + HTTPS). */
-var CACHE = 'limaje-pwa-v1';
-var PRECACHE = ['/', '/Limaje.html', '/manifest.json', '/assets/icon-192.png', '/assets/icon-512.png', '/assets/logo.png'];
+var CACHE = 'limaje-pwa-v2';
+var PRECACHE = ['/', '/Limaje.html', '/manifest.json', '/icon-192.png', '/icon-512.png', '/logo.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(

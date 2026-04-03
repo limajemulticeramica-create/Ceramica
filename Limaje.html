@@ -10,9 +10,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LIMAJE">
 <link rel="manifest" href="/manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-192.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
-<link rel="apple-touch-icon" href="/assets/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>Multi-cerámica LIMAJE — Sistema de Gestión v2.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
@@ -290,12 +290,10 @@
 </head>
 <body>
 
-<!--
-  Supabase (obligatorio antes de subir a Netlify):
-  1) Dashboard → Project Settings → API → copie "Project URL" y "anon public".
-  2) Péguelos entre comillas abajo (sin espacios de más).
--->
+<script src="/limaje-config.js"></script>
 <script>
+if(typeof window.LIMAJE_SUPABASE_URL!=='string')window.LIMAJE_SUPABASE_URL='';
+if(typeof window.LIMAJE_SUPABASE_ANON_KEY!=='string')window.LIMAJE_SUPABASE_ANON_KEY='';
 window.LIMAJE_SUPABASE_URL = window.LIMAJE_SUPABASE_URL || '';
 window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 </script>
@@ -305,7 +303,8 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <!-- INTRODUCCIÓN / BIENVENIDA -->
 <div id="introScreen">
   <div class="intro-box">
-    <img src="assets/logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async">
+    <img src="/logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('introLogoFallback');if(t)t.style.display='block';">
+    <div id="introLogoFallback" style="display:none;font-size:22px;font-weight:700;color:#fff;text-align:center;padding:16px;">Multi-cerámica LIMAJE</div>
     <div class="login-brand-sub">Sistema de Gestión</div>
     <div class="intro-title">Bienvenido</div>
     <div class="intro-text">Sistema de ventas, inventario, cartera y caja para Multi-cerámica LIMAJE. Registre ventas, controle stock, imprima recibos en ticket 57mm y gestione créditos.</div>
@@ -320,7 +319,8 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">
-      <img src="assets/logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async">
+      <img src="/logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('loginLogoFallback');if(t)t.style.display='block';">
+      <div id="loginLogoFallback" style="display:none;font-size:20px;font-weight:700;color:var(--teal-dk);text-align:center;padding:12px;">Multi-cerámica LIMAJE</div>
       <div class="login-brand-sub">Sistema de Gestión</div>
     </div>
     <div id="loginAlert"></div>
@@ -336,7 +336,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
   <div class="topbar">
     <div class="topbar-brand">
       <div class="topbar-logo">
-        <img src="assets/logo.png" alt="Multi-cerámica LIMAJE" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
+        <img src="/logo.png" alt="Multi-cerámica LIMAJE" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
       </div>
       <div class="topbar-name">
         <span class="topbar-name-script">Multi-cerámica LIMAJE</span>
@@ -805,7 +805,7 @@ var _persistTimer=null;
 var _dirtyKeys=new Set();
 var LIMaje_PERSIST_KEYS=['categories','products','movements','cartera','cajaCierres','locations','inventoryLots','cotizaciones','documentosExportados','auditLog','workers','workerPayments','schemaVersion','app_prefs'];
 function getKvWritableKeysForRole(role){
-  if(role==='admin'||role==='contador') return LIMaje_PERSIST_KEYS.slice();
+  if(role==='admin'||role==='contador'||role==='configurador') return LIMaje_PERSIST_KEYS.slice();
   if(role==='vendedor') return ['movements','cartera','products','inventoryLots','locations','cotizaciones','documentosExportados','auditLog','app_prefs'];
   if(role==='bodeguero') return ['products','inventoryLots','locations','movements','auditLog','app_prefs'];
   if(role==='auxiliar_bodega') return ['products','inventoryLots','locations','auditLog','app_prefs'];
@@ -930,8 +930,10 @@ async function enterAppSessionOnce(session){
     document.getElementById('app').style.display='block';
     document.getElementById('userLabel').textContent=currentUser.label;
     setupNav();
-    navigateTo('dashboard');
     subscribeLimajeRealtime();
+    var nav0=getNavForUser();
+    var land=(nav0[0]&&nav0[0].id)||'dashboard';
+    navigateTo(land);
     if(prof&&!prof.intro_seen) showIntro(false);
   }catch(err){
     console.error(err);
@@ -1143,19 +1145,19 @@ function inferTileSpecs(name){
   return {m2PerBox:null,piecesPerBox:null,dimLabel:dm?dm[1]+'×'+dm[2]:''};
 }
 function roleLabel(role){
-  var m={admin:'Administrador',contador:'Contador',vendedor:'Vendedor',bodeguero:'Bodeguero',auxiliar_bodega:'Auxiliar de bodega'};
+  var m={admin:'Administrador',configurador:'Configurador',contador:'Contador',vendedor:'Vendedor',bodeguero:'Bodeguero',auxiliar_bodega:'Auxiliar de bodega'};
   return m[role]||role;
 }
-function canVoidMovement(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='contador'); }
-function canManageUsers(){ return currentUser&&currentUser.role==='admin'; }
-function canSell(){ return currentUser&&(['admin','contador','vendedor'].indexOf(currentUser.role)>=0); }
-function canSeeAllMovements(){ return currentUser&&['admin','contador','bodeguero'].indexOf(currentUser.role)>=0; }
-function canEditCategories(){ return currentUser&&['admin','contador'].indexOf(currentUser.role)>=0; }
-function canEditProductsMaster(){ return currentUser&&['admin','contador'].indexOf(currentUser.role)>=0; }
-function canAddProduct(){ return currentUser&&['admin','contador','bodeguero'].indexOf(currentUser.role)>=0; }
-function canAdjustStock(){ return currentUser&&['admin','contador','bodeguero','auxiliar_bodega'].indexOf(currentUser.role)>=0; }
-function canMarkCarteraPaid(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='contador'); }
-function canCloseCaja(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='contador'); }
+function canVoidMovement(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador'); }
+function canManageUsers(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'); }
+function canSell(){ return currentUser&&(['admin','configurador','contador','vendedor'].indexOf(currentUser.role)>=0); }
+function canSeeAllMovements(){ return currentUser&&['admin','configurador','contador','bodeguero'].indexOf(currentUser.role)>=0; }
+function canEditCategories(){ return currentUser&&['admin','configurador','contador'].indexOf(currentUser.role)>=0; }
+function canEditProductsMaster(){ return currentUser&&['admin','configurador','contador'].indexOf(currentUser.role)>=0; }
+function canAddProduct(){ return currentUser&&['admin','configurador','contador','bodeguero'].indexOf(currentUser.role)>=0; }
+function canAdjustStock(){ return currentUser&&['admin','configurador','contador','bodeguero','auxiliar_bodega'].indexOf(currentUser.role)>=0; }
+function canMarkCarteraPaid(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador'); }
+function canCloseCaja(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador'); }
 
 function initData(){
   if(!DB.get('categories')){
@@ -1229,7 +1231,7 @@ async function doLogin(){
 async function logout(){
   if(window.__limajeSupabase) await window.__limajeSupabase.auth.signOut();
 }
-const isAdmin=()=>currentUser&&currentUser.role==='admin';
+const isAdmin=()=>currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador');
 
 // ============================================================
 // NAV
@@ -1262,7 +1264,7 @@ const NAV_AUX_BOD=[
 ];
 function getNavForUser(){
   const r=currentUser&&currentUser.role;
-  if(r==='admin'||r==='contador') return NAV_ADMIN;
+  if(r==='admin'||r==='configurador'||r==='contador') return NAV_ADMIN;
   if(r==='bodeguero') return NAV_BODEGUERO;
   if(r==='auxiliar_bodega') return NAV_AUX_BOD;
   return NAV_VENDEDOR;
@@ -1290,8 +1292,9 @@ function closeNavDrawer(){
   if(panel) panel.classList.remove('open');
 }
 function navigateTo(id){
-  const allowed=getNavForUser().map(function(t){ return t.id; });
-  if(allowed.indexOf(id)<0) id='dashboard';
+  const tabs=getNavForUser();
+  const allowed=tabs.map(function(t){ return t.id; });
+  if(allowed.length&&allowed.indexOf(id)<0) id=allowed[0];
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   const page=document.getElementById('page-'+id);if(page)page.classList.add('active');
@@ -1704,7 +1707,7 @@ function saveProduct(edit=false){
   alert2('Producto guardado ✅');
 }
 function deleteProduct(id){
-  if(!canManageUsers()) return alert2('Solo el administrador puede eliminar productos','error');
+  if(!canManageUsers()) return alert2('Solo administrador o configurador pueden eliminar productos','error');
   if(!confirm('¿Eliminar este producto?'))return;
   const p=getProdById(id);
   logAudit('eliminar_producto',p?(p.name+' '+p.code):id,'productos',id);
@@ -2130,7 +2133,7 @@ function buildReceiptHTML(mov,mode){
   /* Logo LIMAJE: diamantes verde(L,I), rojo(M,A), azul(J,E) para impresión */
   const logoW=isA4?140:90; const logoH=isA4?32:22;
   const receiptLogo=`<div style="text-align:center;margin-bottom:6px;">
-    <img src="assets/logo.png" alt="Multi-cerámica LIMAJE" style="max-height:${isA4?'52px':'36px'};width:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto 4px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+    <img src="/logo.png" alt="Multi-cerámica LIMAJE" style="max-height:${isA4?'52px':'36px'};width:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto 4px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
     <svg viewBox="0 0 120 28" width="${logoW}" height="${logoH}" style="display:none;vertical-align:middle;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
       <polygon points="10,2 18,14 10,26 2,14" fill="#2e7d32"/><text x="10" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">L</text>
       <polygon points="28,2 36,14 28,26 20,14" fill="#2e7d32"/><text x="28" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">I</text>
@@ -2872,6 +2875,7 @@ function openEditProfileRole(userId, currentRole){
     <div class="form-group"><label>Rol</label>
       <select id="editProfRole">
         <option value="admin">Administrador</option>
+        <option value="configurador">Configurador (soporte / implementación)</option>
         <option value="contador">Contador</option>
         <option value="vendedor">Vendedor</option>
         <option value="bodeguero">Bodeguero</option>
@@ -2903,7 +2907,7 @@ async function submitEditProfileRole(){
   void renderUsers();
 }
 function openAddUser(){
-  if(!canManageUsers()) return alert2('Solo el administrador gestiona usuarios','error');
+  if(!canManageUsers()) return alert2('Solo administrador o configurador gestionan usuarios','error');
   showModal(`<h2>➕ Nuevo usuario</h2>
     <p style="color:var(--text2);font-size:12px;">Crea la cuenta en Supabase Auth. Si tiene activada la confirmación por correo, el usuario debe abrir el enlace antes de entrar.</p>
     <div class="form-group"><label>Correo electrónico</label><input type="email" id="newUserEmail" autocomplete="off"></div>
@@ -2916,6 +2920,7 @@ function openAddUser(){
         <option value="bodeguero">Bodeguero</option>
         <option value="auxiliar_bodega">Auxiliar de bodega</option>
         <option value="admin">Administrador</option>
+        <option value="configurador">Configurador (soporte)</option>
       </select>
     </div>
     <div id="newUserError" class="alert alert-error" style="display:none;"></div>
@@ -3522,12 +3527,12 @@ function pdfLoadLogo(callback){
     fr.onerror=function(){ next(null); };
     fr.readAsDataURL(blob);
   }
-  fetch('assets/logo.png',{cache:'reload'})
+  fetch('/logo.png',{cache:'reload'})
     .then(function(r){ return r.ok?r.blob():Promise.reject(); })
     .then(function(b){ fromBlob(b,function(u){ callback(u||pdfLogoBadgeDataUrl()); }); })
     .catch(function(){
       var xhr=new XMLHttpRequest();
-      xhr.open('GET','assets/logo.png',true);
+      xhr.open('GET','/logo.png',true);
       xhr.responseType='blob';
       xhr.onload=function(){
         if((xhr.status===200||xhr.status===0)&&xhr.response&&xhr.response.size)
@@ -4067,7 +4072,7 @@ function migrateData(){
   const currentSchema = DB.get('schemaVersion', 1);
   if(currentSchema < SCHEMA_VERSION){
     const rr=currentUser&&currentUser.role;
-    if(rr!=='admin'&&rr!=='contador'){
+    if(rr!=='admin'&&rr!=='configurador'&&rr!=='contador'){
       if(!_migrateSchemaWarned){
         _migrateSchemaWarned=true;
         alert2('Actualización de datos pendiente: inicie sesión como administrador o contador una vez para completar la migración del esquema.','error');
@@ -4297,7 +4302,7 @@ function exportarJSON(){
 }
 
 function importarJSON(event){
-  if(!canManageUsers()){ alert2('Solo el administrador puede importar respaldos JSON.','error'); event.target.value=''; return; }
+  if(!canManageUsers()){ alert2('Solo administrador o configurador pueden importar respaldos JSON.','error'); event.target.value=''; return; }
   const file = event.target.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = function(e){
@@ -4559,7 +4564,11 @@ void bootLimajeApp();
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('/sw.js',{ scope:'/' }).catch(function(){});
+    navigator.serviceWorker.register('/sw.js',{ scope:'/' }).then(function(reg){
+      console.log('LIMAJE PWA: service worker OK',reg.scope);
+    }).catch(function(err){
+      console.warn('LIMAJE PWA: service worker (opcional)',err);
+    });
   });
 }
 </script>
