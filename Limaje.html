@@ -9,10 +9,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LIMAJE">
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="/icon-192.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Multi-cerámica LIMAJE — Sistema de Gestión v2.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
@@ -305,7 +305,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <!-- INTRODUCCIÓN / BIENVENIDA -->
 <div id="introScreen">
   <div class="intro-box">
-    <img src="/logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('introLogoFallback');if(t)t.style.display='block';">
+    <img src="logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('introLogoFallback');if(t)t.style.display='block';">
     <div id="introLogoFallback" style="display:none;font-size:22px;font-weight:700;color:#fff;text-align:center;padding:16px;">Multi-cerámica LIMAJE</div>
     <div class="login-brand-sub">Sistema de Gestión</div>
     <div class="intro-title">Bienvenido</div>
@@ -321,7 +321,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">
-      <img src="/logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('loginLogoFallback');if(t)t.style.display='block';">
+      <img src="logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('loginLogoFallback');if(t)t.style.display='block';">
       <div id="loginLogoFallback" style="display:none;font-size:20px;font-weight:700;color:var(--teal-dk);text-align:center;padding:12px;">Multi-cerámica LIMAJE</div>
       <div class="login-brand-sub">Sistema de Gestión</div>
     </div>
@@ -338,7 +338,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
   <div class="topbar">
     <div class="topbar-brand">
       <div class="topbar-logo">
-        <img src="/logo.png" alt="Multi-cerámica LIMAJE" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
+        <img src="logo.png" alt="Multi-cerámica LIMAJE" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
       </div>
       <div class="topbar-name">
         <span class="topbar-name-script">Multi-cerámica LIMAJE</span>
@@ -820,6 +820,8 @@ function filterPersistKeys(keys){
 var SUPABASE_URL=(typeof window.LIMAJE_SUPABASE_URL==='string'&&window.LIMAJE_SUPABASE_URL)?window.LIMAJE_SUPABASE_URL:'';
 var SUPABASE_ANON_KEY=(typeof window.LIMAJE_SUPABASE_ANON_KEY==='string'&&window.LIMAJE_SUPABASE_ANON_KEY)?window.LIMAJE_SUPABASE_ANON_KEY:'';
 function limajeSupabaseConfigured(){ return SUPABASE_URL.length>12&&SUPABASE_ANON_KEY.length>30; }
+/** Recurso estático junto a Limaje.html (válido en raíz o subcarpeta). */
+function limajeAssetUrl(rel){ try{ return new URL(rel||'',location.href).href; }catch(e){ return rel||''; } }
 
 const DB={
   get(k,def=null){
@@ -972,12 +974,12 @@ async function applyProfile(user){
   var prof=r.data;
   if(!prof){
     var meta=user.user_metadata||{};
+    /* No enviar role: el trigger SQL o un UPDATE manual definen configurador; no pisar con vendedor */
     var ins=await sb.from('profiles').upsert({
       id:user.id,
       email:user.email||null,
       username:(user.email||'').split('@')[0],
       full_name:meta.full_name||user.email||'Usuario',
-      role:'vendedor',
       intro_seen:false
     },{ onConflict:'id' }).select().single();
     if(ins.error) console.error(ins.error);
@@ -1006,18 +1008,12 @@ async function bootLimajeApp(){
   }
   if(!limajeSupabaseConfigured()){
     var b=document.getElementById('loginAlert');
-    if(b) b.innerHTML='<div class="alert alert-error">Defina <code>window.LIMAJE_SUPABASE_URL</code> y <code>window.LIMAJE_SUPABASE_ANON_KEY</code> en el &lt;script&gt; del HTML (Dashboard Supabase → API).</div>';
+    if(b) b.innerHTML='<div class="alert alert-error">Defina <code>window.LIMAJE_SUPABASE_URL</code> y <code>window.LIMAJE_SUPABASE_ANON_KEY</code> en <code>limaje-config.js</code> (Dashboard Supabase → API).</div>';
     return;
   }
-  var __limajeAuthMem={};
-  window.__limajeAuthStorage={
-    getItem:function(key){ return Object.prototype.hasOwnProperty.call(__limajeAuthMem,key)?__limajeAuthMem[key]:null; },
-    setItem:function(key,val){ __limajeAuthMem[key]=val; },
-    removeItem:function(key){ delete __limajeAuthMem[key]; }
-  };
+  /* localStorage por defecto: sesión persistente entre recargas (requerido para PWA/operación diaria). */
   window.__limajeSupabase=sbLib.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
     auth:{
-      storage:window.__limajeAuthStorage,
       persistSession:true,
       autoRefreshToken:true,
       detectSessionInUrl:true
@@ -1147,7 +1143,7 @@ function inferTileSpecs(name){
   return {m2PerBox:null,piecesPerBox:null,dimLabel:dm?dm[1]+'×'+dm[2]:''};
 }
 function roleLabel(role){
-  var m={admin:'Administrador',configurador:'Configurador',contador:'Contador',vendedor:'Vendedor',bodeguero:'Bodeguero',auxiliar_bodega:'Auxiliar de bodega'};
+  var m={admin:'Administrador',configurador:'Súper admin (configurador)',contador:'Contador',vendedor:'Vendedor',bodeguero:'Bodeguero',auxiliar_bodega:'Auxiliar de bodega'};
   return m[role]||role;
 }
 function canVoidMovement(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador'); }
@@ -1216,6 +1212,9 @@ function hideIntro(){
 }
 
 async function doLogin(){
+  if(window.__limajeBootPromise){
+    try{ await window.__limajeBootPromise; }catch(e){ console.error(e); }
+  }
   const el=document.getElementById('loginAlert');
   if(!window.__limajeSupabase){
     if(el) el.innerHTML='<div class="alert alert-error">Falta configurar Supabase: revise <code>limaje-config.js</code> (URL debe ser https://…supabase.co y la anon key completa). Recargue con Ctrl+F5.</div>';
@@ -2139,7 +2138,7 @@ function buildReceiptHTML(mov,mode){
   /* Logo LIMAJE: diamantes verde(L,I), rojo(M,A), azul(J,E) para impresión */
   const logoW=isA4?140:90; const logoH=isA4?32:22;
   const receiptLogo=`<div style="text-align:center;margin-bottom:6px;">
-    <img src="/logo.png" alt="Multi-cerámica LIMAJE" style="max-height:${isA4?'52px':'36px'};width:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto 4px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+    <img src="${limajeAssetUrl('logo.png')}" alt="Multi-cerámica LIMAJE" style="max-height:${isA4?'52px':'36px'};width:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto 4px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
     <svg viewBox="0 0 120 28" width="${logoW}" height="${logoH}" style="display:none;vertical-align:middle;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
       <polygon points="10,2 18,14 10,26 2,14" fill="#2e7d32"/><text x="10" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">L</text>
       <polygon points="28,2 36,14 28,26 20,14" fill="#2e7d32"/><text x="28" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">I</text>
@@ -2881,7 +2880,7 @@ function openEditProfileRole(userId, currentRole){
     <div class="form-group"><label>Rol</label>
       <select id="editProfRole">
         <option value="admin">Administrador</option>
-        <option value="configurador">Configurador (soporte / implementación)</option>
+        <option value="configurador">Súper admin (configurador)</option>
         <option value="contador">Contador</option>
         <option value="vendedor">Vendedor</option>
         <option value="bodeguero">Bodeguero</option>
@@ -2926,7 +2925,7 @@ function openAddUser(){
         <option value="bodeguero">Bodeguero</option>
         <option value="auxiliar_bodega">Auxiliar de bodega</option>
         <option value="admin">Administrador</option>
-        <option value="configurador">Configurador (soporte)</option>
+        <option value="configurador">Súper admin (configurador)</option>
       </select>
     </div>
     <div id="newUserError" class="alert alert-error" style="display:none;"></div>
@@ -2950,12 +2949,18 @@ async function submitAddUser(){
     options:{ data:{ full_name:label, role:role } }
   });
   if(reg.error){ errEl.textContent=reg.error.message; errEl.style.display='block'; return; }
+  var newUserId=reg.data&&reg.data.user&&reg.data.user.id;
   if(prev&&prev.refresh_token){
     var rest=await window.__limajeSupabase.auth.setSession({ access_token:prev.access_token, refresh_token:prev.refresh_token });
     if(rest.error) console.warn('Restaurar sesión admin:',rest.error);
   }
+  /* El trigger SQL crea el perfil como vendedor; el rol elegido aquí lo aplica el configurador/admin vía RLS */
+  if(newUserId){
+    var ur=await window.__limajeSupabase.from('profiles').update({ role:role, full_name:label }).eq('id',newUserId);
+    if(ur.error) console.warn('Ajustar rol de nuevo usuario:',ur.error);
+  }
   closeModal();
-  logAudit('registrar_usuario_auth',email+' — '+label,'usuarios',email);
+  logAudit('registrar_usuario_auth',email+' — '+label+' → '+role,'usuarios',email);
   alert2('Usuario registrado. Si hay confirmación por correo, el nuevo usuario debe validar el enlace.','success');
   void renderUsers();
 }
@@ -3533,12 +3538,12 @@ function pdfLoadLogo(callback){
     fr.onerror=function(){ next(null); };
     fr.readAsDataURL(blob);
   }
-  fetch('/logo.png',{cache:'reload'})
+  fetch(limajeAssetUrl('logo.png'),{cache:'reload'})
     .then(function(r){ return r.ok?r.blob():Promise.reject(); })
     .then(function(b){ fromBlob(b,function(u){ callback(u||pdfLogoBadgeDataUrl()); }); })
     .catch(function(){
       var xhr=new XMLHttpRequest();
-      xhr.open('GET','/logo.png',true);
+      xhr.open('GET',limajeAssetUrl('logo.png'),true);
       xhr.responseType='blob';
       xhr.onload=function(){
         if((xhr.status===200||xhr.status===0)&&xhr.response&&xhr.response.size)
@@ -4271,7 +4276,7 @@ function confirmarAjuste(){
 // EXPORTAR / IMPORTAR JSON — con versionado y nombre dinámico
 // ============================================================
 function exportarJSON(){
-  if(!currentUser||(['admin','contador'].indexOf(currentUser.role)<0)){ alert2('Solo administrador o contador pueden exportar el respaldo JSON.','error'); return; }
+  if(!currentUser||(['admin','configurador','contador'].indexOf(currentUser.role)<0)){ alert2('Solo administrador, configurador o contador pueden exportar el respaldo JSON.','error'); return; }
   const now = new Date();
   // Nombre dinámico con fecha y hora exacta
   const pad = n => String(n).padStart(2,'0');
@@ -4580,12 +4585,14 @@ function bindLimajeAuthUi(){
   if(pw) pw.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); void doLogin(); } });
 }
 bindLimajeAuthUi();
-void bootLimajeApp();
+window.__limajeBootPromise=bootLimajeApp();
 </script>
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('/sw.js',{ scope:'/' }).then(function(reg){
+    var swUrl=new URL('sw.js',window.location.href).href;
+    var scopeUrl=new URL('./',window.location.href).href;
+    navigator.serviceWorker.register(swUrl,{ scope:scopeUrl }).then(function(reg){
       console.log('LIMAJE PWA: service worker OK',reg.scope);
     }).catch(function(err){
       console.warn('LIMAJE PWA: service worker (opcional)',err);

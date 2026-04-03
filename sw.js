@@ -1,11 +1,30 @@
-/* LIMAJE — service worker mínimo para instalación PWA (Netlify + HTTPS). */
-var CACHE = 'limaje-pwa-v4';
-var PRECACHE = ['/', '/Limaje.html', '/manifest.json', '/icon-192.png', '/icon-512.png', '/logo.png'];
+/* LIMAJE — service worker mínimo para instalación PWA (Netlify + HTTPS).
+   Rutas relativas al scope del SW (sirve en raíz o en subcarpeta). */
+var CACHE = 'limaje-pwa-v5';
+
+function limajeShellUrl() {
+  return new URL('Limaje.html', self.registration.scope).href;
+}
+
+function limajePrecacheList() {
+  var base = self.registration.scope;
+  var files = ['Limaje.html', 'index.html', 'limaje-config.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'logo.png'];
+  var out = files.map(function (f) {
+    return new URL(f, base).href;
+  });
+  try {
+    if (new URL(base).pathname === '/' || new URL(base).pathname === '') {
+      out.unshift(new URL('/', base).href);
+    }
+  } catch (e) {}
+  return out;
+}
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (cache) {
-      return cache.addAll(PRECACHE.map(function (u) { return new Request(u, { cache: 'reload' }); })).catch(function () {});
+      var list = limajePrecacheList();
+      return cache.addAll(list.map(function (u) { return new Request(u, { cache: 'reload' }); })).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
   );
 });
@@ -39,7 +58,7 @@ self.addEventListener('fetch', function (e) {
           if (ext === 'js' || ext === 'json' || ext === 'png' || ext === 'ico' || ext === 'svg' || ext === 'woff2')
             return new Response('', { status: 504, statusText: 'Sin red' });
           if (req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') >= 0)
-            return caches.match('/Limaje.html');
+            return caches.match(limajeShellUrl());
           return new Response('', { status: 504 });
         });
       })
