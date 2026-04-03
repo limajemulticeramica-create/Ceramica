@@ -34,6 +34,8 @@
   body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;}
 
   #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--brand-green-dk) 0%,var(--brand-green) 25%,var(--brand-red) 50%,var(--brand-blue) 100%);position:relative;overflow:hidden;}
+  #loginScreen .btn,#loginScreen a[href]{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,0.08);cursor:pointer;}
+  #introScreen .btn,#introScreen a[href]{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,0.08);cursor:pointer;}
   #loginScreen::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.06'%3E%3Cpath d='M0 0h40v40H0zm40 40h40v40H40z'/%3E%3C/g%3E%3C/svg%3E");}
   .login-box{background:var(--white);border-radius:20px;padding:44px;width:420px;position:relative;box-shadow:0 30px 80px rgba(0,0,0,0.2);z-index:1;}
   .login-logo{display:flex;flex-direction:column;align-items:center;margin-bottom:26px;}
@@ -290,7 +292,7 @@
 </head>
 <body>
 
-<script src="/limaje-config.js"></script>
+<script src="limaje-config.js"></script>
 <script>
 if(typeof window.LIMAJE_SUPABASE_URL!=='string')window.LIMAJE_SUPABASE_URL='';
 if(typeof window.LIMAJE_SUPABASE_ANON_KEY!=='string')window.LIMAJE_SUPABASE_ANON_KEY='';
@@ -309,9 +311,9 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     <div class="intro-title">Bienvenido</div>
     <div class="intro-text">Sistema de ventas, inventario, cartera y caja para Multi-cerámica LIMAJE. Registre ventas, controle stock, imprima recibos en ticket 57mm y gestione créditos.</div>
     <div class="intro-actions">
-      <button type="button" class="btn btn-full" onclick="hideIntro()">Continuar</button>
+      <button type="button" class="btn btn-full" id="btnIntroContinue">Continuar</button>
     </div>
-    <div class="intro-skip"><a href="#" onclick="event.preventDefault();hideIntro();">No mostrar de nuevo</a> — al continuar no se mostrará esta pantalla al abrir el programa.</div>
+    <div class="intro-skip"><a href="#" id="linkIntroSkip">No mostrar de nuevo</a> — al continuar no se mostrará esta pantalla al abrir el programa.</div>
   </div>
 </div>
 
@@ -325,9 +327,9 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     </div>
     <div id="loginAlert"></div>
     <div class="form-group"><label>Correo electrónico</label><input type="email" id="loginUser" placeholder="ejemplo@correo.com" autocomplete="username"></div>
-    <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button type="button" class="btn btn-full" onclick="void doLogin()">Ingresar al Sistema</button>
-    <p style="text-align:center;margin-top:14px;"><a href="#" onclick="event.preventDefault();showIntro(false);" style="font-size:12px;color:var(--text2);text-decoration:underline;cursor:pointer;">Ver introducción</a></p>
+    <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
+    <button type="button" class="btn btn-full" id="btnLimajeLogin">Ingresar al Sistema</button>
+    <p style="text-align:center;margin-top:14px;"><a href="#" id="linkLimajeIntro" style="font-size:12px;color:var(--text2);text-decoration:underline;">Ver introducción</a></p>
   </div>
 </div>
 
@@ -4563,6 +4565,21 @@ function runExcelStockImport(wb){
 // ============================================================
 // INIT — arranque en la nube (initData/migrate dentro de sesión)
 // ============================================================
+function bindLimajeAuthUi(){
+  if(window.__limajeAuthUiBound) return;
+  window.__limajeAuthUiBound=true;
+  var b=document.getElementById('btnLimajeLogin');
+  if(b) b.addEventListener('click',function(){ void doLogin(); });
+  var li=document.getElementById('linkLimajeIntro');
+  if(li) li.addEventListener('click',function(e){ e.preventDefault(); showIntro(false); });
+  var ic=document.getElementById('btnIntroContinue');
+  if(ic) ic.addEventListener('click',function(){ hideIntro(); });
+  var sk=document.getElementById('linkIntroSkip');
+  if(sk) sk.addEventListener('click',function(e){ e.preventDefault(); hideIntro(); });
+  var pw=document.getElementById('loginPass');
+  if(pw) pw.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); void doLogin(); } });
+}
+bindLimajeAuthUi();
 void bootLimajeApp();
 </script>
 <script>

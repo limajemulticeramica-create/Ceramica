@@ -1,5 +1,5 @@
 /* LIMAJE — service worker mínimo para instalación PWA (Netlify + HTTPS). */
-var CACHE = 'limaje-pwa-v2';
+var CACHE = 'limaje-pwa-v4';
 var PRECACHE = ['/', '/Limaje.html', '/manifest.json', '/icon-192.png', '/icon-512.png', '/logo.png'];
 
 self.addEventListener('install', function (e) {
@@ -32,7 +32,15 @@ self.addEventListener('fetch', function (e) {
       })
       .catch(function () {
         return caches.match(req).then(function (hit) {
-          return hit || caches.match('/Limaje.html');
+          if (hit) return hit;
+          var path = (url.pathname || '').toLowerCase();
+          var ext = path.indexOf('.') >= 0 ? path.split('.').pop() : '';
+          /* Nunca devolver HTML en lugar de .js/.json → rompe la app (SyntaxError). */
+          if (ext === 'js' || ext === 'json' || ext === 'png' || ext === 'ico' || ext === 'svg' || ext === 'woff2')
+            return new Response('', { status: 504, statusText: 'Sin red' });
+          if (req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') >= 0)
+            return caches.match('/Limaje.html');
+          return new Response('', { status: 504 });
         });
       })
   );
