@@ -347,18 +347,18 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     </div>
     <div style="flex:1;"></div>
     <div class="topbar-user">
-      <button type="button" class="btn btn-menu btn-secondary" id="btnOpenNav" onclick="toggleNavDrawer()" title="Abrir menú de módulos">☰ Menú</button>
+      <button type="button" class="btn btn-menu btn-secondary" id="btnOpenNav" title="Abrir menú de módulos">☰ Menú</button>
       <span class="user-pill" id="userLabel"></span>
-      <button class="btn btn-sm btn-secondary" onclick="logout()">Salir</button>
+      <button type="button" class="btn btn-sm btn-secondary" id="btnLimajeLogout">Salir</button>
     </div>
   </div>
 
   <!-- Panel de navegación desde la derecha -->
-  <div class="nav-drawer-overlay" id="navDrawerOverlay" onclick="closeNavDrawer()"></div>
+  <div class="nav-drawer-overlay" id="navDrawerOverlay" role="presentation"></div>
   <div class="nav-drawer" id="navDrawer">
     <div class="nav-drawer-header">
       <span>Módulos</span>
-      <button type="button" class="nav-drawer-close" onclick="closeNavDrawer()" aria-label="Cerrar">×</button>
+      <button type="button" class="nav-drawer-close" id="navDrawerClose" aria-label="Cerrar">×</button>
     </div>
     <div class="nav-drawer-list" id="navDrawerList"></div>
   </div>
@@ -878,7 +878,13 @@ async function hydrateFromSupabase(){
   var sb=window.__limajeSupabase;
   if(!sb) return;
   var r=await sb.from('limaje_kv').select('key,value');
-  if(r.error) throw r.error;
+  if(r.error){
+    var em=(r.error.message||'')+' '+(r.error.code||'');
+    var hint='';
+    if(/jwt|session|invalid/i.test(em)) hint=' (cierre sesión y vuelva a entrar, o borre datos del sitio para la PWA)';
+    if(/permission|rls|policy/i.test(em)) hint=' (ejecute schema.sql en Supabase y confirme que está logueado)';
+    throw new Error(String(r.error.message||r.error)+hint);
+  }
   (r.data||[]).forEach(function(row){ _kvCache[row.key]=row.value; });
 }
 function clearKvCache(){
@@ -889,14 +895,21 @@ var _remoteUiTimer=null;
 function subscribeLimajeRealtime(){
   var sb=window.__limajeSupabase;
   if(!sb||_limajeRealtimeCh) return;
-  _limajeRealtimeCh=sb.channel('limaje-kv-sync')
-    .on('postgres_changes',{ event:'*', schema:'public', table:'limaje_kv' }, function(payload){
-      if(payload.new&&payload.new.key!=null){
-        _kvCache[payload.new.key]=payload.new.value;
-        scheduleRemoteUIRefresh();
-      }
-    })
-    .subscribe();
+  try{
+    _limajeRealtimeCh=sb.channel('limaje-kv-sync')
+      .on('postgres_changes',{ event:'*', schema:'public', table:'limaje_kv' }, function(payload){
+        if(payload.new&&payload.new.key!=null){
+          _kvCache[payload.new.key]=payload.new.value;
+          scheduleRemoteUIRefresh();
+        }
+      })
+      .subscribe(function(status){
+        if(status==='CHANNEL_ERROR'||status==='TIMED_OUT') console.warn('LIMAJE Realtime:',status,'(la app funciona sin sincronía en vivo; revise Realtime en Supabase)');
+      });
+  }catch(e){
+    console.warn('LIMAJE Realtime no disponible:',e);
+    _limajeRealtimeCh=null;
+  }
 }
 function scheduleRemoteUIRefresh(){
   clearTimeout(_remoteUiTimer);
@@ -930,6 +943,8 @@ async function enterAppSessionOnce(session){
     var prof=await applyProfile(session.user);
     migrateData();
     await flushPersistQueue();
+    var introEl=document.getElementById('introScreen');
+    if(introEl) introEl.style.display='none';
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('userLabel').textContent=currentUser.label;
@@ -937,7 +952,14 @@ async function enterAppSessionOnce(session){
     subscribeLimajeRealtime();
     var nav0=getNavForUser();
     var land=(nav0[0]&&nav0[0].id)||'dashboard';
-    navigateTo(land);
+    try{
+      navigateTo(land);
+    }catch(navErr){
+      console.error('navigateTo',land,navErr);
+      var fb=document.getElementById('page-ventas')||document.getElementById('page-dashboard');
+      if(fb) fb.classList.add('active');
+      alert2('Abra ☰ Menú para elegir módulo. Si algo falla, recargue la página.','error');
+    }
     if(prof&&!prof.intro_seen) showIntro(false);
   }catch(err){
     console.error(err);
@@ -995,7 +1017,12 @@ async function applyProfile(user){
   return prof;
 }
 async function handleAuthChange(event,session){
-  if(event==='INITIAL_SESSION'||event==='TOKEN_REFRESHED') return;
+  /* Supabase v2: a veces getSession() va vacío al inicio y solo INITIAL_SESSION trae la sesión guardada */
+  if(event==='INITIAL_SESSION'){
+    if(session&&session.user) await enterAppSessionOnce(session);
+    return;
+  }
+  if(event==='TOKEN_REFRESHED') return;
   if(event==='SIGNED_OUT'){ exitAppSessionUI(); return; }
   if(event==='SIGNED_IN'&&session) await enterAppSessionOnce(session);
 }
@@ -1023,6 +1050,10 @@ async function bootLimajeApp(){
     void handleAuthChange(event,session);
   });
   var sess=(await __limajeSupabase.auth.getSession()).data.session;
+  if(!sess){
+    await new Promise(function(r){ setTimeout(r,120); });
+    sess=(await __limajeSupabase.auth.getSession()).data.session;
+  }
   if(sess) await enterAppSessionOnce(sess);
   else{
     document.getElementById('loginScreen').style.display='flex';
@@ -1304,27 +1335,32 @@ function navigateTo(id){
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   const page=document.getElementById('page-'+id);if(page)page.classList.add('active');
   const tab=document.getElementById('tab-'+id);if(tab)tab.classList.add('active');
-  if(id==='dashboard')renderDashboard();
-  if(id==='categorias'){renderCategoryTree();renderProducts();populateCatFilters();setupCatButtons();}
-  if(id==='ventas'){renderSaleCart();searchSaleProducts();}
-  if(id==='cotizaciones'){
-    renderCotizacionesList();
-    var lc=document.getElementById('cotizListaCard'), ec=document.getElementById('cotizEditorCard'), bv=document.getElementById('cotizBtnVolver');
-    if(cotizEditId!=null){
-      if(lc) lc.style.display='none'; if(ec) ec.style.display='block'; if(bv) bv.style.display='inline-flex';
-    }else{
-      if(lc) lc.style.display='block'; if(ec) ec.style.display='none'; if(bv) bv.style.display='none';
+  try{
+    if(id==='dashboard')renderDashboard();
+    if(id==='categorias'){renderCategoryTree();renderProducts();populateCatFilters();setupCatButtons();}
+    if(id==='ventas'){renderSaleCart();searchSaleProducts();}
+    if(id==='cotizaciones'){
+      renderCotizacionesList();
+      var lc=document.getElementById('cotizListaCard'), ec=document.getElementById('cotizEditorCard'), bv=document.getElementById('cotizBtnVolver');
+      if(cotizEditId!=null){
+        if(lc) lc.style.display='none'; if(ec) ec.style.display='block'; if(bv) bv.style.display='inline-flex';
+      }else{
+        if(lc) lc.style.display='block'; if(ec) ec.style.display='none'; if(bv) bv.style.display='none';
+      }
     }
+    if(id==='inventario'){renderInventario();populateCatFilters();}
+    if(id==='cartera')renderCartera();
+    if(id==='caja')renderCaja();
+    if(id==='movimientos')renderMovimientos();
+    if(id==='reportes'){setReportDates();populateReportFilters();}
+    if(id==='documentos') renderDocumentosPage();
+    if(id==='trabajadores')renderTrabajadores();
+    if(id==='auditoria')renderAuditoria();
+    if(id==='usuarios')void renderUsers();
+  }catch(e){
+    console.error('render página',id,e);
+    throw e;
   }
-  if(id==='inventario'){renderInventario();populateCatFilters();}
-  if(id==='cartera')renderCartera();
-  if(id==='caja')renderCaja();
-  if(id==='movimientos')renderMovimientos();
-  if(id==='reportes'){setReportDates();populateReportFilters();}
-  if(id==='documentos') renderDocumentosPage();
-  if(id==='trabajadores')renderTrabajadores();
-  if(id==='auditoria')renderAuditoria();
-  if(id==='usuarios')void renderUsers();
 }
 
 // ============================================================
@@ -2876,7 +2912,7 @@ var _editProfileId=null;
 function openEditProfileRole(userId, currentRole){
   if(!canManageUsers()) return;
   _editProfileId=userId;
-  showModal(`<h2>Editar rol</h2><p style="color:var(--text2);font-size:12px;">Usuario: `+escapeHtmlLot(String(userId).slice(0,8))+'…</p>
+  showModal(`<h2>Editar rol</h2><p style="color:var(--text2);font-size:12px;">Usuario: ${escapeHtmlLot(String(userId).slice(0,8))}…</p>
     <div class="form-group"><label>Rol</label>
       <select id="editProfRole">
         <option value="admin">Administrador</option>
@@ -4583,6 +4619,14 @@ function bindLimajeAuthUi(){
   if(sk) sk.addEventListener('click',function(e){ e.preventDefault(); hideIntro(); });
   var pw=document.getElementById('loginPass');
   if(pw) pw.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); void doLogin(); } });
+  var menu=document.getElementById('btnOpenNav');
+  if(menu) menu.addEventListener('click',function(){ toggleNavDrawer(); });
+  var out=document.getElementById('btnLimajeLogout');
+  if(out) out.addEventListener('click',function(){ void logout(); });
+  var nov=document.getElementById('navDrawerOverlay');
+  if(nov) nov.addEventListener('click',function(){ closeNavDrawer(); });
+  var ncl=document.getElementById('navDrawerClose');
+  if(ncl) ncl.addEventListener('click',function(){ closeNavDrawer(); });
 }
 bindLimajeAuthUi();
 window.__limajeBootPromise=bootLimajeApp();
