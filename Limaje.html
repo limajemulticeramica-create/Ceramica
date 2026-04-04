@@ -285,6 +285,11 @@
     .topbar{flex-wrap:wrap;height:auto;padding:8px 10px;gap:6px;}
     .topbar-user{font-size:11px;}
   }
+  /* Módulo 3 — Bloqueo por inactividad */
+  #limajeLockOverlay{position:fixed;inset:0;background:rgba(15,23,42,.88);z-index:99999;display:none;align-items:center;justify-content:center;padding:20px;}
+  #limajeLockOverlay.visible{display:flex;}
+  #limajeLockBox{background:#fff;border-radius:14px;padding:22px 26px;max-width:380px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.35);}
+  #limajeLockBox h3{margin:0 0 10px 0;font-size:18px;color:var(--teal-dk);}
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -299,6 +304,7 @@ if(typeof window.LIMAJE_SUPABASE_ANON_KEY!=='string')window.LIMAJE_SUPABASE_ANON
 window.LIMAJE_SUPABASE_URL = window.LIMAJE_SUPABASE_URL || '';
 window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 </script>
+<script src="limaje-modules.js"></script>
 
 <div id="toast"></div>
 
@@ -367,6 +373,17 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 
   <div class="content">
 
+    <!-- Módulo 3 — Pantalla de desbloqueo (no cierra sesión Supabase) -->
+    <div id="limajeLockOverlay" aria-hidden="true">
+      <div id="limajeLockBox">
+        <h3>Sesión bloqueada por inactividad</h3>
+        <p style="font-size:13px;color:var(--text2);margin:0 0 12px 0;">Ingrese la contraseña de desbloqueo configurada en <strong>Utilidades</strong> (o deje el PIN vacío en prefs para omitir verificación).</p>
+        <div class="form-group"><label>Contraseña de desbloqueo</label><input type="password" id="limajeLockPass" autocomplete="off" placeholder="••••••"></div>
+        <p id="limajeLockErr" style="color:var(--red);font-size:12px;margin:0 0 10px 0;"></p>
+        <button type="button" class="btn btn-full" id="limajeLockUnlockBtn">Desbloquear</button>
+      </div>
+    </div>
+
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
       <div class="page-header">
@@ -407,6 +424,13 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
       <div class="grid-2">
         <div class="card">
           <div class="card-title">🔍 Buscar Producto</div>
+          <div class="form-group" style="margin-bottom:8px;"><label style="font-size:11px;">Unidad al agregar (productos con m²/pzs en catálogo)</label>
+            <select id="saleAddUnitMode" onchange="searchSaleProducts()">
+              <option value="cajas">Cajas</option>
+              <option value="m2">Metros² (m²)</option>
+              <option value="piezas">Piezas</option>
+            </select>
+          </div>
           <div style="display:flex;gap:8px;margin-bottom:10px;">
             <input type="text" id="saleSearch" placeholder="🔍 Escribe nombre o código..." oninput="searchSaleProducts()" style="flex:1;" autocomplete="off">
             <button class="btn btn-sm btn-secondary" onclick="document.getElementById('saleSearch').value='';searchSaleProducts();" title="Limpiar">✕</button>
@@ -468,16 +492,23 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
           <select id="cotizFiltroEstado" onchange="renderCotizacionesList()">
             <option value="">Todos los estados</option>
             <option value="borrador">Borrador</option>
-            <option value="en_espera">En espera de confirmación</option>
-            <option value="confirmada">Confirmada</option>
-            <option value="pedido">Pedido (cerrada)</option>
+            <option value="pendiente">Pendiente (reserva stock)</option>
+            <option value="pendiente_abastecimiento">Pendiente abastecimiento</option>
+            <option value="convertida">Convertida a venta</option>
+            <option value="cancelada">Cancelada</option>
+            <option value="rechazada">Rechazada</option>
+            <option value="en_espera">En espera (histórico)</option>
+            <option value="confirmada">Confirmada (histórico)</option>
+            <option value="pedido">Pedido / cerrada (histórico)</option>
           </select>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="navigateTo('cotiz-historial')">📊 Historial SQL</button>
         </div>
         <div class="table-wrap" id="cotizacionesTable"></div>
       </div>
       <div class="card" id="cotizEditorCard" style="display:none;">
         <div class="card-title" id="cotizEditorTitle">Nueva cotización</div>
-        <p id="cotizEditorAviso" style="display:none;font-size:13px;color:var(--amber);font-weight:600;margin-bottom:12px;">🔒 Esta cotización ya pasó a <strong>pedido</strong>: solo puede consultar, exportar PDF o ver historial.</p>
+        <p id="cotizPresenceBanner" style="display:none;font-size:12px;color:var(--amber);font-weight:600;margin-bottom:8px;padding:8px;border-radius:8px;background:var(--amber-bg,#fff8e6);border:1px solid var(--amber);"></p>
+        <p id="cotizEditorAviso" style="display:none;font-size:13px;color:var(--amber);font-weight:600;margin-bottom:12px;">🔒 Esta cotización ya no es editable (convertida, cancelada, período archivado, etc.).</p>
         <div class="grid-2" style="gap:12px;">
           <div class="form-group"><label>Cliente</label><input type="text" id="cotizCliente" placeholder="Nombre o razón social"></div>
           <div class="form-group"><label>NIT</label><input type="text" id="cotizNit" placeholder="Opcional"></div>
@@ -485,8 +516,13 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
           <div class="form-group"><label>Estado</label>
             <select id="cotizEstado" onchange="cotizOnEstadoChange()">
               <option value="borrador">Borrador</option>
-              <option value="en_espera">En espera de confirmación</option>
-              <option value="confirmada">Confirmada</option>
+              <option value="pendiente">Pendiente (reserva stock al guardar)</option>
+              <option value="pendiente_abastecimiento">Pendiente abastecimiento</option>
+              <option value="convertida">Convertida (venta generada)</option>
+              <option value="cancelada">Cancelada</option>
+              <option value="rechazada">Rechazada</option>
+              <option value="en_espera">En espera (legado)</option>
+              <option value="confirmada">Confirmada (legado)</option>
               <option value="pedido">Pedido (cierra edición)</option>
             </select>
           </div>
@@ -527,7 +563,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
         <div class="table-wrap" id="cotizLineasTable"></div>
         <div id="cotizTotales" style="margin:14px 0;font-size:15px;font-weight:700;color:var(--teal-dk);"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-          <button type="button" class="btn" onclick="cotizGuardar()" id="cotizBtnGuardar">💾 Guardar cotización</button>
+          <button type="button" class="btn" onclick="void cotizGuardar()" id="cotizBtnGuardar">💾 Guardar cotización</button>
           <button type="button" class="btn btn-success" onclick="cotizGenerarPDF()" id="cotizBtnPdf">📄 Generar PDF</button>
           <button type="button" class="btn btn-amber" onclick="cotizCargarEnVenta()" id="cotizBtnVenta" title="Llena el carrito de ventas con ítems que tengan producto en inventario">🛒 Cargar en venta</button>
         </div>
@@ -754,6 +790,89 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
       </div>
     </div>
 
+    <!-- Módulo 4 — Historial cotizaciones (SQL, paginado) -->
+    <div class="page" id="page-cotiz-historial">
+      <div class="page-header"><h2>📊 Historial de cotizaciones (nube)</h2></div>
+      <div class="card">
+        <div class="search-bar" style="flex-wrap:wrap;">
+          <div class="form-group" style="margin:0;"><label>Desde</label><input type="date" id="cotHistFrom"></div>
+          <div class="form-group" style="margin:0;"><label>Hasta</label><input type="date" id="cotHistTo"></div>
+          <div class="form-group" style="margin:0;"><label>Estado</label>
+            <select id="cotHistEstado"><option value="">Todos</option>
+              <option value="borrador">Borrador</option><option value="pendiente">Pendiente</option>
+              <option value="pendiente_abastecimiento">Pend. abastecimiento</option><option value="convertida">Convertida</option>
+              <option value="cancelada">Cancelada</option><option value="rechazada">Rechazada</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;min-width:120px;"><label>Cliente</label><input type="text" id="cotHistCliente" placeholder="Contiene…"></div>
+          <div class="form-group" style="margin:0;min-width:100px;"><label>Producto (texto ítems)</label><input type="text" id="cotHistProd" placeholder="Código o nombre"></div>
+          <button type="button" class="btn" onclick="cotHistLoad(true)">Filtrar</button>
+        </div>
+        <div id="cotHistResumen" style="font-size:13px;margin:10px 0;color:var(--teal-dk);font-weight:600;"></div>
+        <div class="table-wrap" id="cotHistTable"></div>
+        <div style="display:flex;gap:10px;margin-top:12px;align-items:center;">
+          <button type="button" class="btn btn-sm btn-secondary" id="cotHistPrev" onclick="cotHistPrevPage()">← Anterior</button>
+          <span id="cotHistPageLbl" style="font-size:12px;color:var(--text2);"></span>
+          <button type="button" class="btn btn-sm btn-secondary" id="cotHistNext" onclick="cotHistNextPage()">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Módulo 4 — Períodos archivados -->
+    <div class="page" id="page-periodos">
+      <div class="page-header"><h2>📅 Períodos y archivo</h2></div>
+      <div class="card">
+        <p style="color:var(--text2);font-size:13px;">Los períodos <strong>cerrados</strong> bloquean edición de cotizaciones asociadas. Solo administración puede abrir/cerrar períodos.</p>
+        <div class="table-wrap" id="periodosTable"></div>
+      </div>
+    </div>
+
+    <!-- Módulo 5 — CSV backup / restore -->
+    <div class="page" id="page-backup-csv">
+      <div class="page-header"><h2>💾 Respaldo CSV</h2></div>
+      <div class="card">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">Exportar o importar cotizaciones, ventas, compras/egresos e inventario. Use filtros de fecha donde aplique.</p>
+        <div class="grid-2" style="gap:12px;">
+          <div class="form-group"><label>Desde</label><input type="date" id="csvFrom"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="csvTo"></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;">
+          <button type="button" class="btn btn-sm btn-success" onclick="csvExport('cotizaciones')">CSV Cotizaciones</button>
+          <button type="button" class="btn btn-sm btn-success" onclick="csvExport('ventas')">CSV Ventas</button>
+          <button type="button" class="btn btn-sm btn-success" onclick="csvExport('compras')">CSV Compras / egresos</button>
+          <button type="button" class="btn btn-sm btn-success" onclick="csvExport('inventario')">CSV Inventario</button>
+        </div>
+        <div class="card-title" style="margin-top:18px;">Importar CSV</div>
+        <p style="font-size:12px;color:var(--text2);">Columnas obligatorias según tipo. Se valida la primera fila (encabezados).</p>
+        <div class="form-group"><label>Tipo</label>
+          <select id="csvImportTipo"><option value="inventario">Inventario (lotes)</option><option value="ventas">Ventas</option></select>
+        </div>
+        <label class="btn btn-secondary" style="cursor:pointer;">Elegir CSV<input type="file" id="csvImportFile" accept=".csv,text/csv" style="display:none;" onchange="csvImportFile(event)"></label>
+        <div id="csvImportResult" style="margin-top:12px;font-size:13px;"></div>
+      </div>
+    </div>
+
+    <!-- Módulo 7 — Actividad reciente (auditoría SQL, solo admin/contador/config) -->
+    <div class="page" id="page-actividad-sql">
+      <div class="page-header"><h2>🔐 Actividad reciente (servidor)</h2></div>
+      <div class="card">
+        <div class="table-wrap" id="actividadSqlTable"></div>
+        <button type="button" class="btn btn-sm" style="margin-top:10px;" onclick="renderActividadSql()">Actualizar</button>
+      </div>
+    </div>
+
+    <!-- Módulo 3 — Utilidades bloqueo -->
+    <div class="page" id="page-utilidades">
+      <div class="page-header"><h2>🛠 Utilidades</h2></div>
+      <div class="card">
+        <div class="card-title">Bloqueo por inactividad</div>
+        <p style="font-size:13px;color:var(--text2);">Minutos sin interacción antes de bloquear la pantalla (clic, tecla o mouse reinician el temporizador). La verificación usa SHA-256 local de la contraseña que defina abajo.</p>
+        <div class="form-group"><label>Minutos</label><input type="number" id="prefInactivityMin" min="1" max="240" value="15"></div>
+        <div class="form-group"><label>Nueva contraseña de desbloqueo</label><input type="password" id="prefUnlockPass" placeholder="Dejar vacío para no exigir PIN"></div>
+        <button type="button" class="btn btn-success" onclick="guardarPrefsBloqueo()">Guardar preferencias</button>
+      </div>
+    </div>
+
     <!-- USUARIOS -->
     <div class="page" id="page-usuarios">
       <div class="page-header"><h2>👤 Usuarios del Sistema</h2><div id="usersAddBtn"></div></div>
@@ -954,6 +1073,7 @@ async function enterAppSessionOnce(session){
     document.getElementById('userLabel').textContent=currentUser.label;
     setupNav();
     subscribeLimajeRealtime();
+    void limajeAfterSessionDataLoaded();
     var nav0=getNavForUser();
     var land=(nav0[0]&&nav0[0].id)||'dashboard';
     try{
@@ -1328,20 +1448,22 @@ const isAdmin=()=>currentUser&&(currentUser.role==='admin'||currentUser.role==='
 // ============================================================
 const NAV_ADMIN=[
   {id:'dashboard',label:'📊 Dashboard'},{id:'categorias',label:'🗂 Categorías'},
-  {id:'ventas',label:'💰 Ventas'},{id:'cotizaciones',label:'📋 Cotizaciones'},{id:'inventario',label:'📦 Inventario'},
+  {id:'ventas',label:'💰 Ventas'},{id:'cotizaciones',label:'📋 Cotizaciones'},{id:'cotiz-historial',label:'📊 Hist. cotiz.'},
+  {id:'inventario',label:'📦 Inventario'},
   {id:'cartera',label:'💳 Cartera'},{id:'caja',label:'🏦 Caja'},
   {id:'movimientos',label:'↔ Movimientos'},{id:'reportes',label:'📄 Reportes'},{id:'documentos',label:'📁 Documentos'},
-  {id:'trabajadores',label:'👷 Trabajadores'},{id:'auditoria',label:'📋 Auditoría'},
+  {id:'trabajadores',label:'👷 Trabajadores'},{id:'auditoria',label:'📋 Auditoría'},{id:'actividad-sql',label:'🔐 Act. servidor'},
+  {id:'periodos',label:'📅 Períodos'},{id:'backup-csv',label:'💾 CSV'},{id:'utilidades',label:'🛠 Utilidades'},
   {id:'usuarios',label:'👤 Usuarios'},
 ];
 const NAV_VENDEDOR=[
   {id:'ventas',label:'💰 Nueva Venta'},
-  {id:'cotizaciones',label:'📋 Cotizaciones'},
+  {id:'cotizaciones',label:'📋 Cotizaciones'},{id:'cotiz-historial',label:'📊 Hist. cotiz.'},
   {id:'categorias',label:'🗂 Productos'},
   {id:'cartera',label:'💳 Cartera'},
   {id:'caja',label:'🏦 Caja'},
   {id:'movimientos',label:'🧾 Mis Ventas'},
-  {id:'documentos',label:'📁 Documentos'},
+  {id:'documentos',label:'📁 Documentos'},{id:'backup-csv',label:'💾 CSV'},{id:'utilidades',label:'🛠 Utilidades'},
 ];
 const NAV_BODEGUERO=[
   {id:'dashboard',label:'📊 Dashboard'},
@@ -1355,8 +1477,8 @@ const NAV_AUX_BOD=[
 function getNavForUser(){
   const r=currentUser&&currentUser.role;
   if(r==='admin'||r==='configurador'||r==='contador') return NAV_ADMIN;
-  if(r==='bodeguero') return NAV_BODEGUERO;
-  if(r==='auxiliar_bodega') return NAV_AUX_BOD;
+  if(r==='bodeguero') return NAV_BODEGUERO.concat([{id:'backup-csv',label:'💾 CSV'},{id:'utilidades',label:'🛠 Utilidades'}]);
+  if(r==='auxiliar_bodega') return NAV_AUX_BOD.concat([{id:'utilidades',label:'🛠 Utilidades'}]);
   return NAV_VENDEDOR;
 }
 
@@ -1392,7 +1514,7 @@ function navigateTo(id){
   try{
     if(id==='dashboard')renderDashboard();
     if(id==='categorias'){renderCategoryTree();renderProducts();populateCatFilters();setupCatButtons();}
-    if(id==='ventas'){renderSaleCart();searchSaleProducts();}
+    if(id==='ventas'){void limajeRefreshStockMap();renderSaleCart();searchSaleProducts();}
     if(id==='cotizaciones'){
       renderCotizacionesList();
       var lc=document.getElementById('cotizListaCard'), ec=document.getElementById('cotizEditorCard'), bv=document.getElementById('cotizBtnVolver');
@@ -1402,7 +1524,7 @@ function navigateTo(id){
         if(lc) lc.style.display='block'; if(ec) ec.style.display='none'; if(bv) bv.style.display='none';
       }
     }
-    if(id==='inventario'){renderInventario();populateCatFilters();}
+    if(id==='inventario'){void limajeRefreshStockMap();renderInventario();populateCatFilters();}
     if(id==='cartera')renderCartera();
     if(id==='caja')renderCaja();
     if(id==='movimientos')renderMovimientos();
@@ -1411,6 +1533,11 @@ function navigateTo(id){
     if(id==='trabajadores')renderTrabajadores();
     if(id==='auditoria')renderAuditoria();
     if(id==='usuarios')void renderUsers();
+    if(id==='cotiz-historial'){cotHistInitDates();void cotHistLoad(true);}
+    if(id==='periodos')void renderPeriodosPage();
+    if(id==='backup-csv')csvInitDates();
+    if(id==='actividad-sql')void renderActividadSql();
+    if(id==='utilidades')loadPrefsBloqueoUi();
   }catch(e){
     console.error('render página',id,e);
     throw e;
@@ -1449,11 +1576,269 @@ function getAuditLog(){return DB.get('auditLog',[]);}
 function getWorkers(){return DB.get('workers',[]);}
 function getWorkerPayments(){return DB.get('workerPayments',[]);}
 function getCotizaciones(){return DB.get('cotizaciones',[]);}
+var __limajeStockResMap={};
+var __limajePeriodoCerradoMap={};
+var cotHistOffset=0;
+var COT_HIST_PAGE=50;
+function limajeMapSqlRowToCotiz(row){
+  var pid=row.periodo_id;
+  return {
+    id:row.numero_serial,
+    sqlId:row.id,
+    cliente:row.cliente||'',
+    nit:row.nit||'',
+    telefono:row.telefono||'',
+    nota:row.nota||'',
+    status:row.status||'borrador',
+    descuento:Number(row.descuento)||0,
+    subtotal:Number(row.subtotal)||0,
+    total:Number(row.total)||0,
+    items:row.items||[],
+    historial:row.historial||[],
+    ventaId:row.venta_id,
+    periodoId:pid,
+    periodoCerrado:pid?!!__limajePeriodoCerradoMap[pid]:false,
+    fecha:row.fecha||'',
+    date:row.fecha||'',
+    ts:row.ts_millis||Date.now(),
+    creadoPor:row.creado_por||'',
+    actualizadoPor:row.actualizado_por||'',
+    elaboradoPor:row.elaborado_por,
+    elaboradoRol:row.elaborado_rol,
+    elaboradoLabel:row.elaborado_label
+  };
+}
+async function limajeRefreshStockMap(){
+  var LM=window.__limajeSqlCore;
+  if(!LM||!window.__limajeSupabase) return;
+  __limajeStockResMap=await LM.fetchStockReservedMap();
+}
+async function limajeRefreshCotizacionesFromSql(){
+  var LM=window.__limajeSqlCore;
+  if(!LM||!window.__limajeSupabase) return;
+  var r=await LM.pullCotizaciones(limajeMapSqlRowToCotiz);
+  if(r.ok&&r.list&&r.list.length) DB.set('cotizaciones',r.list);
+}
+async function limajeAfterSessionDataLoaded(){
+  var LM=window.__limajeSqlCore;
+  if(!LM||!window.__limajeSupabase) return;
+  try{
+    var per=await LM.fetchPeriodos();
+    __limajePeriodoCerradoMap={};
+    (per||[]).forEach(function(p){ __limajePeriodoCerradoMap[p.id]=!!p.cerrado; });
+    await limajeRefreshCotizacionesFromSql();
+  }catch(e){ console.warn('limajeAfterSession',e); }
+  try{ await limajeRefreshStockMap(); }catch(e){}
+  try{ LM.setupInactivityLock(); }catch(e2){}
+}
+function limajeDisponibleEnBodega(p,loc){
+  var base=stockAtLoc(p,loc);
+  var LM=window.__limajeSqlCore;
+  if(!LM||!__limajeStockResMap||!Object.keys(__limajeStockResMap).length) return base;
+  return LM.disponibleFromMap(__limajeStockResMap,String(p.id),loc,base);
+}
+function cotHistInitDates(){
+  var t=document.getElementById('cotHistTo');var f=document.getElementById('cotHistFrom');
+  if(t&&!t.value) t.value=today();
+  if(f&&!f.value){ var d=new Date();d.setMonth(d.getMonth()-1);f.value=d.toISOString().split('T')[0]; }
+}
+function csvInitDates(){
+  var t=document.getElementById('csvTo');var f=document.getElementById('csvFrom');
+  if(t&&!t.value) t.value=today();
+  if(f&&!f.value){ var d=new Date();d.setMonth(d.getMonth()-1);f.value=d.toISOString().split('T')[0]; }
+}
+async function cotHistLoad(reset){
+  var sb=window.__limajeSupabase;if(!sb){alert2('Sin conexión','error');return;}
+  if(reset) cotHistOffset=0;
+  var from=(document.getElementById('cotHistFrom')&&document.getElementById('cotHistFrom').value)||'';
+  var to=(document.getElementById('cotHistTo')&&document.getElementById('cotHistTo').value)||'';
+  var st=(document.getElementById('cotHistEstado')&&document.getElementById('cotHistEstado').value)||'';
+  var cli=(document.getElementById('cotHistCliente')&&document.getElementById('cotHistCliente').value.trim().toLowerCase())||'';
+  var pr=(document.getElementById('cotHistProd')&&document.getElementById('cotHistProd').value.trim().toLowerCase())||'';
+  var q=sb.from('limaje_cotizaciones').select('*',{ count:'exact' }).order('fecha',{ ascending:false }).order('numero_serial',{ ascending:false });
+  if(from) q=q.gte('fecha',from);
+  if(to) q=q.lte('fecha',to);
+  if(st) q=q.eq('status',st);
+  var r=await q.range(cotHistOffset,cotHistOffset+COT_HIST_PAGE-1);
+  if(r.error){ alert2('Error: '+r.error.message,'error'); return; }
+  var rows=r.data||[];
+  if(cli) rows=rows.filter(function(c){ return String(c.cliente||'').toLowerCase().indexOf(cli)>=0; });
+  if(pr) rows=rows.filter(function(c){
+    try{ return JSON.stringify(c.items||[]).toLowerCase().indexOf(pr)>=0; }catch(e){ return false; }
+  });
+  var totCot=0,totConf=0,totCan=0;
+  (r.data||[]).forEach(function(c){
+    var t=Number(c.total)||0;
+    totCot+=t;
+    if(c.status==='convertida') totConf+=t;
+    if(c.status==='cancelada'||c.status==='rechazada') totCan+=t;
+  });
+  var el=document.getElementById('cotHistResumen');
+  if(el) el.textContent='Página: total cotizado Q '+totCot.toFixed(2)+' · convertido Q '+totConf.toFixed(2)+' · cancelado/rechazado Q '+totCan.toFixed(2)+' (solo esta página)';
+  var tb=document.getElementById('cotHistTable');
+  if(tb) tb.innerHTML=rows.length?'<table><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Estado</th><th>Total</th></tr></thead><tbody>'+
+    rows.map(function(c){
+      return '<tr><td>'+c.numero_serial+'</td><td>'+escapeHtml(c.fecha||'')+'</td><td>'+escapeHtml(c.cliente||'')+'</td><td><span class="badge badge-teal">'+
+        escapeHtml(cotizEstadoLabel(c.status))+'</span></td><td>'+fmt(c.total||0)+'</td></tr>';
+    }).join('')+'</tbody></table>':'<p style="color:var(--text2);">Sin resultados.</p>';
+  var lbl=document.getElementById('cotHistPageLbl');
+  if(lbl) lbl.textContent='Registros '+(cotHistOffset+1)+'–'+(cotHistOffset+rows.length)+ (r.count!=null?' · Total aprox. '+r.count:'');
+}
+function cotHistPrevPage(){ if(cotHistOffset>=COT_HIST_PAGE){ cotHistOffset-=COT_HIST_PAGE; void cotHistLoad(false); } }
+function cotHistNextPage(){ cotHistOffset+=COT_HIST_PAGE; void cotHistLoad(false); }
+async function renderPeriodosPage(){
+  var tb=document.getElementById('periodosTable');if(!tb)return;
+  if(!currentUser||!(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador')){ tb.innerHTML='<p class="alert alert-error">Solo administración puede gestionar períodos.</p>'; return; }
+  var LM=window.__limajeSqlCore;if(!LM){tb.innerHTML='—';return;}
+  var rows=await LM.fetchPeriodos();
+  tb.innerHTML=rows.length?'<table><thead><tr><th>Clave</th><th>Inicio</th><th>Fin</th><th>Cerrado</th><th></th></tr></thead><tbody>'+
+    rows.map(function(p){
+      return '<tr><td>'+escapeHtml(p.granularidad+' '+p.periodo_key)+'</td><td>'+p.fecha_inicio+'</td><td>'+p.fecha_fin+'</td><td>'+(p.cerrado?'Sí':'No')+'</td><td>'+
+        '<button type="button" class="btn btn-sm" onclick="togglePeriodoCerrado(\''+p.id+'\','+(!p.cerrado)+')">'+(p.cerrado?'Reabrir':'Cerrar')+'</button></td></tr>';
+    }).join('')+'</tbody></table>':'<p style="color:var(--text2);">Sin períodos aún (se crean al guardar cotizaciones).</p>';
+}
+async function togglePeriodoCerrado(id, cerrado){
+  try{
+    await window.__limajeSqlCore.togglePeriodoCerrado(id, cerrado);
+    var per=await window.__limajeSqlCore.fetchPeriodos();
+    __limajePeriodoCerradoMap={};
+    per.forEach(function(p){ __limajePeriodoCerradoMap[p.id]=!!p.cerrado; });
+    await limajeRefreshCotizacionesFromSql();
+    renderPeriodosPage();
+    alert2('Período actualizado','success');
+  }catch(e){ alert2(String(e.message||e),'error'); }
+}
+function csvExport(kind){
+  var LM=window.__limajeSqlCore;var from=(document.getElementById('csvFrom')&&document.getElementById('csvFrom').value)||'';var to=(document.getElementById('csvTo')&&document.getElementById('csvTo').value)||'';
+  if(kind==='inventario'){
+    var rows=[];
+    getProducts().forEach(function(p){
+      ensureStockByLoc(p);
+      LOC_CODES.forEach(function(loc){
+        getLots().filter(function(l){ return l.productId===p.id&&l.locationCode===loc; }).forEach(function(l){
+          rows.push({ producto_id:p.id,codigo:p.code,nombre:p.name,bodega:loc,lote:l.lotCode,cajas:l.qty,metros_caja:p.m2PerBox||'',piezas_caja:p.piecesPerBox||'' });
+        });
+      });
+    });
+    return LM.downloadCsv('limaje_inventario_'+today()+'.csv',rows);
+  }
+  if(kind==='cotizaciones'){
+    var list=getCotizaciones().filter(function(c){ if(from&&c.date<from) return false; if(to&&c.date>to) return false; return true; });
+    var rows2=list.map(function(c){
+      return { id:c.id,fecha:c.date||c.fecha,cliente:c.cliente,estado:c.status,total:c.total,sql_id:c.sqlId||'' };
+    });
+    return LM.downloadCsv('limaje_cotizaciones_'+today()+'.csv',rows2);
+  }
+  if(kind==='ventas'){
+    var mvs=getMovements().filter(function(m){ return m.type==='venta'&&( (!from||m.date>=from) && (!to||m.date<=to) ); });
+    var rows3=mvs.map(function(m){ return { id:m.id,fecha:m.date,cliente:m.note,total:m.total,pago:m.pago,items_json:JSON.stringify(m.items||[]) }; });
+    return LM.downloadCsv('limaje_ventas_'+today()+'.csv',rows3);
+  }
+  if(kind==='compras'){
+    var eg=getMovements().filter(function(m){ return m.type==='egreso'&&( (!from||m.date>=from) && (!to||m.date<=to) ); });
+    var rows4=eg.map(function(m){ return { id:m.id,fecha:m.date,total:m.total,desc:m.desc,categ:m.categ }; });
+    return LM.downloadCsv('limaje_egresos_'+today()+'.csv',rows4);
+  }
+}
+async function csvImportFile(ev){
+  var f=ev.target.files&&ev.target.files[0];if(!f)return;
+  var txt=await f.text();
+  var LM=window.__limajeSqlCore;
+  var tipo=(document.getElementById('csvImportTipo')&&document.getElementById('csvImportTipo').value)||'inventario';
+  var rows=LM.parseCsv(txt);
+  var out=document.getElementById('csvImportResult');
+  if(tipo==='inventario'){
+    var v=LM.validateCsvHeaders(rows,['producto_id','bodega','lote','cajas']);
+    if(!v.ok){ if(out) out.innerHTML='<span class="alert alert-error">'+escapeHtml(v.error)+'</span>'; return; }
+    var h=v.headers, lots=getLots(), prods=getProducts();
+    for(var i=1;i<rows.length;i++){
+      var R=rows[i],obj={};
+      h.forEach(function(key,idx){ obj[key]=R[idx]; });
+      var pid=parseInt(obj.producto_id,10), caj=parseInt(obj.cajas,10)||0, loc=obj.bodega||'LOCAL', code=String(obj.lote||'').trim();
+      if(!pid||!code||caj<0) continue;
+      if(!prods.some(function(p){ return p.id===pid; })) continue;
+      var dupe=lots.some(function(l){ return l.productId===pid&&l.locationCode===loc&&String(l.lotCode)===code; });
+      if(dupe) lots=lots.map(function(l){ if(l.productId===pid&&l.locationCode===loc&&String(l.lotCode)===code) return Object.assign({},l,{ qty:caj }); return l; });
+      else lots.push({ id:Date.now()+i,productId:pid,locationCode:loc,lotCode:code,qty:caj,receivedAt:Date.now() });
+    }
+    saveLots(lots);
+    getProducts().forEach(function(p){ syncStockFromLots(p); });
+    DB.set('products',getProducts());
+    if(out) out.innerHTML='<span class="alert alert-success">Inventario importado. Revise lotes.</span>';
+    try{ renderInventario(); }catch(e){}
+    ev.target.value='';
+    return;
+  }
+  if(tipo==='ventas'){
+    var v2=LM.validateCsvHeaders(rows,['fecha','cliente','total']);
+    if(!v2.ok){ if(out) out.innerHTML='<span class="alert alert-error">'+escapeHtml(v2.error)+'</span>'; return; }
+    var h2=v2.headers, mvs=getMovements();
+    for(var j=1;j<rows.length;j++){
+      var R2=rows[j],o2={};
+      h2.forEach(function(key,idx){ o2[key]=R2[idx]; });
+      var tot=parseFloat(o2.total)||0, id=nextMovementId();
+      mvs.push({ id:id,type:'venta',ts:Date.now(),date:o2.fecha||today(),subtotal:tot,descuento:0,total:tot,pago:o2.pago||'Efectivo',note:o2.cliente||'',vendedor:(currentUser&&currentUser.username)||'import',items:[] });
+    }
+    DB.set('movements',mvs);
+    if(out) out.innerHTML='<span class="alert alert-success">Ventas importadas (revise ítems vacíos).</span>';
+    ev.target.value='';
+  }
+}
+async function renderActividadSql(){
+  var tb=document.getElementById('actividadSqlTable');if(!tb)return;
+  if(!currentUser||!(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador')){ tb.innerHTML='<p class="alert alert-error">Solo personal autorizado.</p>'; return; }
+  var rows=await window.__limajeSqlCore.fetchAuditoria(null,null,250);
+  tb.innerHTML=rows.length?'<table><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Tabla</th><th>ID</th></tr></thead><tbody>'+
+    rows.map(function(a){
+      return '<tr><td style="font-size:11px">'+escapeHtml(String(a.created_at))+'</td><td>'+escapeHtml(a.username||'')+'</td><td>'+escapeHtml(a.accion)+'</td><td>'+escapeHtml(a.tabla_afectada)+'</td><td style="font-size:11px">'+escapeHtml(a.registro_id)+'</td></tr>';
+    }).join('')+'</tbody></table>':'Sin registros.';
+}
+function loadPrefsBloqueoUi(){
+  var p=DB.get('app_prefs',{});
+  var m=document.getElementById('prefInactivityMin');if(m) m.value=p.inactivityLockMinutes||15;
+}
+async function guardarPrefsBloqueo(){
+  var p=DB.get('app_prefs',{});
+  p.inactivityLockMinutes=parseInt(document.getElementById('prefInactivityMin').value,10)||15;
+  var pass=(document.getElementById('prefUnlockPass')&&document.getElementById('prefUnlockPass').value)||'';
+  if(pass) p.unlockPinSha256=await window.__limajeSqlCore.sha256Hex(pass);
+  else delete p.unlockPinSha256;
+  DB.set('app_prefs',p);
+  document.getElementById('prefUnlockPass').value='';
+  alert2('Preferencias guardadas','success');
+}
+function limajeOnPresenceRemote(){
+  var bid=document.getElementById('cotizPresenceBanner');if(!bid)return;
+  var q=getCotizaciones().find(function(x){ return x.id===cotizEditId; });
+  if(!q||!q.sqlId){ bid.style.display='none'; return; }
+  void window.__limajeSqlCore.presenceFetchOthers('cotizacion',q.sqlId,currentUser&&currentUser.id).then(function(others){
+    if(!others.length){ bid.style.display='none'; return; }
+    bid.style.display='block';
+    bid.textContent='⚠ Otra sesión está viendo/editando esta cotización: '+others.map(function(o){ return o.user_label||o.user_id; }).join(', ');
+  });
+}
 function cotizEstadoLabel(s){
-  var m={borrador:'Borrador',en_espera:'En espera',confirmada:'Confirmada',pedido:'Pedido'};
+  var m={
+    borrador:'Borrador',
+    pendiente:'Pendiente',
+    pendiente_abastecimiento:'Pend. abastecimiento',
+    convertida:'Convertida',
+    cancelada:'Cancelada',
+    rechazada:'Rechazada',
+    en_espera:'En espera',
+    confirmada:'Confirmada',
+    pedido:'Pedido'
+  };
   return m[s]||s;
 }
-function cotizEsEditable(q){ return q && q.status !== 'pedido'; }
+function cotizEsEditable(q){
+  if(!q) return false;
+  if(q.periodoCerrado) return false;
+  var st=q.status;
+  if(st==='pedido'||st==='convertida'||st==='cancelada'||st==='rechazada') return false;
+  if(st==='pendiente_abastecimiento') return false;
+  return true;
+}
 function getCatName(id){const c=getCategories().find(c=>c.id===id);return c?c.name:'—';}
 function getProdById(id){return getProducts().find(p=>p.id===id);}
 
@@ -1882,6 +2267,14 @@ function addStock(id){
   DB.set('products',prods);closeModal();renderInventario();renderProducts();renderDashboard();
   alert2('Stock +'+qty+' en '+LOC_LABELS[loc]+' ✅');
   logAudit('ajuste_stock','+'+qty+' '+LOC_LABELS[loc]+' — '+prods[idx].name,'productos',id);
+  void (async function(){
+    try{
+      await window.__limajeSqlCore.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+      await window.__limajeSqlCore.abastecimientoCubrirRpc(id, loc);
+      await limajeRefreshStockMap();
+      await flushPersistQueue();
+    }catch(e){}
+  })();
 }
 function openProductLotsViewer(pid){ openProductLotsManager(pid); }
 function openProductLotsManager(pid){
@@ -1944,7 +2337,25 @@ function addProductLotEntry(pid){
 // VENTA — con descuento validado por precio límite
 // ============================================================
 let cart=[];
-
+function saleLineCajas(c){
+  var p=getProdById(c.id);
+  if(!p) return Math.max(1,parseInt(c.qty,10)||1);
+  if(c.qtyMode==='m2'&&Number(p.m2PerBox)>0){
+    var m2=Number(c.m2)||0;
+    return Math.max(1,Math.ceil(m2/Number(p.m2PerBox)-1e-9));
+  }
+  if(c.qtyMode==='piezas'&&Number(p.piecesPerBox)>0){
+    var pz=Number(c.piezas)||0;
+    return Math.max(1,Math.ceil(pz/Number(p.piecesPerBox)-1e-9));
+  }
+  return Math.max(1,parseInt(c.qty,10)||1);
+}
+function saleLineSubtotal(c){
+  var p=getProdById(c.id);
+  if(c.qtyMode==='m2'&&p&&cotizProductSupportsM2(p)) return cotizPrecioPorM2(p)*Number(c.m2||0);
+  if(c.qtyMode==='piezas'&&p&&Number(p.piecesPerBox)>0) return (Number(p.price)||0)/Number(p.piecesPerBox)*Number(c.piezas||0);
+  return (Number(c.price)||0)*(Number(c.qty)||1);
+}
 function searchSaleProducts(){
   const q=(valById('saleSearch')||'').toLowerCase().trim();
   const prods=getProducts();
@@ -1959,8 +2370,10 @@ function searchSaleProducts(){
     return;
   }
   el.innerHTML=results.map(p=>{ensureStockByLoc(p);recomputeStockTotal(p);const sl=stockAtLoc(p,'LOCAL'),s1=stockAtLoc(p,'BOD1'),s2=stockAtLoc(p,'BOD2');
+    var dl=limajeDisponibleEnBodega(p,'LOCAL'),d1=limajeDisponibleEnBodega(p,'BOD1'),d2=limajeDisponibleEnBodega(p,'BOD2');
+    var disp=dl+d1+d2;
     return`
-    <div class="sale-item ${p.stock===0?'sale-item-disabled':''}" onclick="${p.stock>0?`addToCart(${p.id})`:'alert2(\'Sin stock disponible\',\'error\')'}">
+    <div class="sale-item ${disp===0?'sale-item-disabled':''}" onclick="${disp>0?`addToCart(${p.id})`:'alert2(\'Sin stock disponible\',\'error\')'}">
       <div style="flex:1;min-width:0;">
         <span class="badge badge-teal" style="margin-right:5px;">${escapeHtml(p.code)}</span>
         <span style="font-weight:600">${escapeHtml(p.name)}</span><br>
@@ -1970,9 +2383,10 @@ function searchSaleProducts(){
         <div><span class="precio-venta">${fmt(p.price)}</span></div>
         ${p.priceCost>0?`<div style="font-size:10px;color:var(--text2);">Costo: ${fmt(p.priceCost)}</div>`:''}
         ${p.priceLimit>0?`<div><span class="precio-limite" style="font-size:10px;">mín ${fmt(p.priceLimit)}</span></div>`:''}
-        <div style="font-size:10px;color:var(--text2);">L ${sl} · B1 ${s1} · B2 ${s2}</div>
-        <div style="font-size:11px;color:${p.stock===0?'var(--red)':p.stock<=5?'var(--amber)':'var(--text2)'}">
-          Σ ${p.stock}${p.stock===0?' ❌':p.stock<=5?' ⚠️':''}
+        <div style="font-size:10px;color:var(--text2);">Fís. L ${sl} · B1 ${s1} · B2 ${s2}</div>
+        <div style="font-size:10px;color:var(--teal-dk);">Disp. L ${dl} · B1 ${d1} · B2 ${d2}</div>
+        <div style="font-size:11px;color:${disp===0?'var(--red)':disp<=5?'var(--amber)':'var(--text2)'}">
+          Σ disp. ${disp}${disp===0?' ❌':disp<=5?' ⚠️':''}
         </div>
       </div>
     </div>`;}).join('');
@@ -2021,7 +2435,7 @@ function pickDefaultLocation(p){
   var order=['LOCAL','BOD1','BOD2'];
   var best=null,bq=-1;
   order.forEach(function(c){
-    var q=stockAtLoc(p,c);
+    var q=limajeDisponibleEnBodega(p,c);
     if(q>bq){bq=q;best=c;}
   });
   return best;
@@ -2029,31 +2443,88 @@ function pickDefaultLocation(p){
 function addToCart(id){
   if(!canSell()) return alert2('Sin permiso de venta','error');
   const p=getProdById(id);ensureStockByLoc(p);recomputeStockTotal(p);
-  if(!p||p.stock<=0)return alert2('Sin stock','error');
+  if(!p)return alert2('Producto no encontrado','error');
   const loc=pickDefaultLocation(p);
   if(!loc)return alert2('Sin stock en bodegas','error');
-  const existing=cart.find(c=>c.id===id&&c.locationCode===loc);
-  if(existing){
-    if(existing.qty>=stockAtLoc(p,loc))return alert2('No hay más stock en '+LOC_LABELS[loc],'error');
-    existing.qty++;
-  }else{
-    cart.push({lineId:Date.now()+Math.floor(Math.random()*1e5),id:id,code:p.code,name:p.name,price:p.price,priceCost:p.priceCost||0,priceLimit:p.priceLimit||0,qty:1,locationCode:loc});
+  var mode=(document.getElementById('saleAddUnitMode')&&document.getElementById('saleAddUnitMode').value)||'cajas';
+  var newLine={ lineId:Date.now()+Math.floor(Math.random()*1e5), id:id, code:p.code, name:p.name, price:p.price, priceCost:p.priceCost||0, priceLimit:p.priceLimit||0, locationCode:loc, qtyMode:'cajas', qty:1 };
+  if(mode==='m2'&&cotizProductSupportsM2(p)){
+    newLine.qtyMode='m2';
+    newLine.m2=Number(p.m2PerBox)||1;
+    delete newLine.qty;
+  }else if(mode==='piezas'&&cotizProductSupportsM2(p)&&Number(p.piecesPerBox)>0){
+    newLine.qtyMode='piezas';
+    newLine.piezas=Number(p.piecesPerBox)||1;
+    delete newLine.qty;
   }
+  var need=saleLineCajas(newLine);
+  if(need>limajeDisponibleEnBodega(p,loc)){
+    var alt=['LOCAL','BOD1','BOD2'].find(function(c){ return limajeDisponibleEnBodega(p,c)>=need; });
+    if(alt) newLine.locationCode=alt;
+    else return alert2('Sin stock disponible (descontando reservado) para '+p.name,'error');
+  }
+  const existing=cart.find(function(c){ return c.id===id&&c.locationCode===newLine.locationCode&&c.qtyMode===newLine.qtyMode&&(newLine.qtyMode!=='m2'||Math.abs(Number(c.m2)-Number(newLine.m2))<0.0001)&&(newLine.qtyMode!=='piezas'||Math.abs(Number(c.piezas)-Number(newLine.piezas))<0.0001); });
+  if(existing){
+    var addCaj=need;
+    if(existing.qtyMode==='cajas'){
+      if(saleLineCajas(existing)+addCaj>limajeDisponibleEnBodega(p,existing.locationCode)) return alert2('No hay más stock en '+LOC_LABELS[existing.locationCode],'error');
+      existing.qty+=1;
+    }else if(existing.qtyMode==='m2'){
+      existing.m2=(Number(existing.m2)||0)+(Number(p.m2PerBox)||1);
+    }else existing.piezas=(Number(existing.piezas)||0)+(Number(p.piecesPerBox)||1);
+  }else cart.push(newLine);
   renderSaleCart();calcDescuento();
-  alert2(p.name+' agregado ('+LOC_LABELS[loc]+') ✅');
+  alert2(p.name+' agregado ('+LOC_LABELS[newLine.locationCode]+') ✅');
 }
 function removeFromCart(lineId){cart=cart.filter(c=>c.lineId!==lineId);renderSaleCart();calcDescuento();}
+function saleUpdateLine(lineId,field,val){
+  var item=cart.find(function(c){ return c.lineId===lineId; });if(!item)return;
+  var p=getProdById(item.id);if(!p)return;
+  if(field==='m2') item.m2=Math.max(0.01,parseFloat(val)||0.01);
+  if(field==='piezas') item.piezas=Math.max(1,parseInt(val,10)||1);
+  var need=saleLineCajas(item);
+  if(need>limajeDisponibleEnBodega(p,item.locationCode)) return alert2('Cantidad supera disponible en '+LOC_LABELS[item.locationCode],'error');
+  renderSaleCart();calcDescuento();
+}
+function saleSetLineMode(lineId,mode){
+  var item=cart.find(function(c){ return c.lineId===lineId; });if(!item)return;
+  var p=getProdById(item.id);if(!p||!cotizProductSupportsM2(p)) return;
+  if(mode==='m2'){
+    var qc=Math.max(1,parseInt(item.qty,10)||1);
+    item.qtyMode='m2';
+    item.m2=qc*Number(p.m2PerBox);
+    delete item.qty;delete item.piezas;
+  }else if(mode==='piezas'){
+    var qc2=Math.max(1,parseInt(item.qty,10)||1);
+    item.qtyMode='piezas';
+    item.piezas=qc2*Number(p.piecesPerBox);
+    delete item.qty;delete item.m2;
+  }else{
+    item.qtyMode='cajas';
+    if(item.piezas!=null&&Number(p.piecesPerBox)>0)
+      item.qty=Math.max(1,Math.ceil((Number(item.piezas)||0)/Number(p.piecesPerBox)-1e-9));
+    else{
+      var m2v=Number(item.m2)||Number(p.m2PerBox);
+      item.qty=Math.max(1,Math.ceil(m2v/Number(p.m2PerBox)-1e-9));
+    }
+    delete item.m2;delete item.piezas;
+  }
+  renderSaleCart();calcDescuento();
+}
 function updateCartQty(lineId,val){
   const item=cart.find(c=>c.lineId===lineId);if(!item)return;
   const p=getProdById(item.id);
   const qty=Math.max(1,parseInt(val,10)||1);
-  if(qty>stockAtLoc(p,item.locationCode))return alert2('No hay suficiente stock en '+LOC_LABELS[item.locationCode],'error');
-  item.qty=qty;renderSaleCart();calcDescuento();
+  item.qty=qty;
+  var need=saleLineCajas(item);
+  if(need>limajeDisponibleEnBodega(p,item.locationCode))return alert2('No hay suficiente stock en '+LOC_LABELS[item.locationCode],'error');
+  renderSaleCart();calcDescuento();
 }
 function changeCartLineLocation(lineId,newLoc){
   const item=cart.find(c=>c.lineId===lineId);if(!item)return;
   const p=getProdById(item.id);
-  if(stockAtLoc(p,newLoc)<item.qty)return alert2('Stock insuficiente en '+LOC_LABELS[newLoc],'error');
+  var need=saleLineCajas(item);
+  if(limajeDisponibleEnBodega(p,newLoc)<need)return alert2('Stock insuficiente en '+LOC_LABELS[newLoc],'error');
   item.locationCode=newLoc;
   renderSaleCart();calcDescuento();
 }
@@ -2069,21 +2540,38 @@ function renderSaleCart(){
     document.getElementById('saleCartTotal').innerHTML='';
     return;
   }
-  const total=cart.reduce((s,c)=>s+c.price*c.qty,0);
-  const locSel=c=>LOC_CODES.map(code=>`<option value="${code}" ${c.locationCode===code?'selected':''}>${LOC_LABELS[code]} (${stockAtLoc(getProdById(c.id),code)})</option>`).join('');
+  const total=cart.reduce((s,c)=>s+saleLineSubtotal(c),0);
+  const locSel=function(c){
+    var p=getProdById(c.id);
+    return LOC_CODES.map(function(code){
+      var disp=p?limajeDisponibleEnBodega(p,code):0;
+      return '<option value="'+code+'" '+(c.locationCode===code?'selected':'')+'>'+LOC_LABELS[code]+' (disp. '+disp+')</option>';
+    }).join('');
+  };
   document.getElementById('saleCart').innerHTML=`<table>
-    <thead><tr><th>Producto</th><th>Bodega</th><th>P.U.</th><th>Cant.</th><th>Sub.</th><th></th></tr></thead>
-    <tbody>${cart.map(c=>`<tr>
-      <td><span style="font-size:11px;color:var(--text2)">${c.code}</span><br><strong>${c.name}</strong></td>
-      <td><select class="sale-loc-sel" data-line="${c.lineId}" style="font-size:11px;max-width:130px;padding:4px;" onchange="changeCartLineLocation(${c.lineId},this.value)">${locSel(c)}</select></td>
-      <td><span class="precio-venta">${fmt(c.price)}</span></td>
-      <td><input type="number" value="${c.qty}" min="1" style="width:50px;padding:4px 6px;" onchange="updateCartQty(${c.lineId},this.value)"></td>
-      <td><strong>${fmt(c.price*c.qty)}</strong></td>
-      <td><button class="btn btn-sm btn-danger" onclick="removeFromCart(${c.lineId})">✕</button></td>
-    </tr>`).join('')}</tbody></table>`;
+    <thead><tr><th>Producto</th><th>Bodega</th><th>Unidad</th><th>Cant.</th><th>P.U.</th><th>Sub.</th><th></th></tr></thead>
+    <tbody>${cart.map(function(c){
+      var p=getProdById(c.id);
+      var mode=c.qtyMode||'cajas';
+      var unitCell='—';
+      if(p&&cotizProductSupportsM2(p)){
+        unitCell='<select style="font-size:11px;max-width:88px;" onchange="saleSetLineMode('+c.lineId+',this.value)"><option value="cajas" '+(mode==='cajas'?'selected':'')+'>Cajas</option><option value="m2" '+(mode==='m2'?'selected':'')+'>m²</option><option value="piezas" '+(mode==='piezas'?'selected':'')+'>Pzs</option></select>';
+      }
+      var qtyCell='',pu=c.price;
+      if(mode==='m2'){
+        qtyCell='<input type="number" min="0.01" step="0.01" value="'+(Number(c.m2)||0).toFixed(2)+'" style="width:72px;padding:4px;" onchange="saleUpdateLine('+c.lineId+',\'m2\',this.value)"> m²';
+        if(p) pu=cotizPrecioPorM2(p);
+      }else if(mode==='piezas'){
+        qtyCell='<input type="number" min="1" step="1" value="'+(parseInt(c.piezas,10)||1)+'" style="width:56px;padding:4px;" onchange="saleUpdateLine('+c.lineId+',\'piezas\',this.value)"> pzs';
+        if(p&&Number(p.piecesPerBox)>0) pu=(Number(p.price)||0)/Number(p.piecesPerBox);
+      }else{
+        qtyCell='<input type="number" value="'+(c.qty||1)+'" min="1" style="width:50px;padding:4px 6px;" onchange="updateCartQty('+c.lineId+',this.value)"> cj.';
+      }
+      return '<tr><td><span style="font-size:11px;color:var(--text2)">'+c.code+'</span><br><strong>'+c.name+'</strong></td><td><select class="sale-loc-sel" style="font-size:11px;max-width:130px;padding:4px;" onchange="changeCartLineLocation('+c.lineId+',this.value)">'+locSel(c)+'</select></td><td>'+unitCell+'</td><td>'+qtyCell+'</td><td><span class="precio-venta">'+fmt(pu)+(mode==='m2'?'/m²':mode==='piezas'?'/pz':'')+'</span></td><td><strong>'+fmt(saleLineSubtotal(c))+'</strong></td><td><button class="btn btn-sm btn-danger" onclick="removeFromCart('+c.lineId+')">✕</button></td></tr>';
+    }).join('')}</tbody></table>`;
   document.getElementById('saleCartTotal').innerHTML=`
     <div style="background:var(--teal-xs);border-radius:8px;padding:9px 13px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:12px;color:var(--text2);">${cart.reduce((s,c)=>s+c.qty,0)} artículo(s)</span>
+      <span style="font-size:12px;color:var(--text2);">${cart.length} línea(s)</span>
       <span style="font-size:17px;font-weight:700;color:var(--teal-dk);">Subtotal: ${fmt(total)}</span>
     </div>`;
   document.getElementById('saleDiscountArea').style.display='block';
@@ -2092,13 +2580,15 @@ function calcDescuento(){
   if(!cart.length)return;
   const descEl=document.getElementById('saleDescuento');if(!descEl)return;
   const desc=parseFloat(descEl.value)||0;
-  const subtotal=cart.reduce((s,c)=>s+c.price*c.qty,0);
+  const subtotal=cart.reduce((s,c)=>s+saleLineSubtotal(c),0);
   const info=document.getElementById('saleDiscountInfo');if(!info)return;
 
   // Calcular descuento máximo posible según límites
   const maxDesc=cart.reduce((s,c)=>{
     if(c.priceLimit>0){
-      const maxItemDesc=(c.price-c.priceLimit)*c.qty;
+      var lt=saleLineSubtotal(c);
+      var bx=saleLineCajas(c);
+      const maxItemDesc=lt-c.priceLimit*bx;
       return s+Math.max(0,maxItemDesc);
     }
     return s;
@@ -2113,9 +2603,11 @@ function calcDescuento(){
   let violation=false;let violName='';
   cart.forEach(c=>{
     if(c.priceLimit>0){
-      const prop=(c.price*c.qty)/subtotal;
+      var lineTot=saleLineSubtotal(c);
+      const prop=lineTot/subtotal;
       const itemDisc=desc*prop;
-      const finalPerUnit=(c.price*c.qty-itemDisc)/c.qty;
+      var qEff=saleLineCajas(c);
+      const finalPerUnit=(lineTot-itemDisc)/Math.max(1,qEff);
       if(finalPerUnit<c.priceLimit){violation=true;violName=c.name;}
     }
   });
@@ -2138,16 +2630,17 @@ function finalizarVenta(){
   const nit=(document.getElementById('saleNit')&&document.getElementById('saleNit').value.trim())||'';
   const numeroFactura=(document.getElementById('saleFactura')&&document.getElementById('saleFactura').value.trim())||'';
   const desc=parseFloat(document.getElementById('saleDescuento').value)||0;
-  const subtotal=cart.reduce((s,c)=>s+c.price*c.qty,0);
+  const subtotal=cart.reduce((s,c)=>s+saleLineSubtotal(c),0);
 
   // Validar descuento
   if(desc>0){
     let violation=false;
     cart.forEach(c=>{
       if(c.priceLimit>0){
-        const prop=(c.price*c.qty)/subtotal;
+        var lt=saleLineSubtotal(c);
+        const prop=lt/subtotal;
         const itemDisc=desc*prop;
-        const finalPerUnit=(c.price*c.qty-itemDisc)/c.qty;
+        const finalPerUnit=(lt-itemDisc)/Math.max(1,saleLineCajas(c));
         if(finalPerUnit<c.priceLimit)violation=true;
       }
     });
@@ -2163,21 +2656,27 @@ function finalizarVenta(){
     if(ix<0){ alert2('Producto no encontrado: '+ci0.name,'error'); return; }
     var lc=ci0.locationCode||'LOCAL';
     ensureStockByLoc(prods[ix]);
-    if(stockAtLoc(prods[ix],lc)<ci0.qty){ alert2('Stock insuficiente en '+LOC_LABELS[lc]+' para '+ci0.name,'error'); return; }
+    var need0=saleLineCajas(ci0);
+    if(limajeDisponibleEnBodega(prods[ix],lc)<need0){ alert2('Stock insuficiente en '+LOC_LABELS[lc]+' para '+ci0.name,'error'); return; }
   }
   cart.forEach(ci=>{
     const idx=prods.findIndex(p=>p.id===ci.id);
     if(idx<0) return;
     const loc=ci.locationCode||'LOCAL';
-    prods[idx].stockByLocation[loc]=(Number(prods[idx].stockByLocation[loc])||0)-ci.qty;
+    var qc=saleLineCajas(ci);
+    prods[idx].stockByLocation[loc]=(Number(prods[idx].stockByLocation[loc])||0)-qc;
     recomputeStockTotal(prods[idx]);
-    deductLotsFIFO(ci.id,loc,ci.qty);
+    deductLotsFIFO(ci.id,loc,qc);
   });
   DB.set('products',prods);
 
   const mvs=getMovements();
   const movId=nextMovementId();
-  const itemsPayload=cart.map(function(c){ return {lineId:c.lineId,id:c.id,code:c.code,name:c.name,price:c.price,priceCost:c.priceCost,priceLimit:c.priceLimit,qty:c.qty,locationCode:c.locationCode||'LOCAL'}; });
+  const itemsPayload=cart.map(function(c){
+    return { lineId:c.lineId,id:c.id,code:c.code,name:c.name,price:c.price,priceCost:c.priceCost,priceLimit:c.priceLimit,
+      qty:saleLineCajas(c), locationCode:c.locationCode||'LOCAL', qtyMode:c.qtyMode||'cajas', m2:c.m2, piezas:c.piezas,
+      subtotalLinea:saleLineSubtotal(c) };
+  });
   const mov={id:movId,type:'venta',ts:nowTs(),date:today(),subtotal,descuento:desc,total,pago,note,nit,numeroFactura,vendedor:currentUser.username,items:itemsPayload};
   mvs.push(mov);DB.set('movements',mvs);
   logAudit('venta','Total '+fmt(total)+' — '+(cart.length)+' ítems — '+pago,'ventas',movId);
@@ -2196,6 +2695,13 @@ function finalizarVenta(){
   document.getElementById('saleSearch').value='';
   document.getElementById('saleDiscountArea').style.display='none';
   renderSaleCart();searchSaleProducts();
+  void (async function(){
+    try{
+      await window.__limajeSqlCore.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+      await limajeRefreshStockMap();
+      await flushPersistQueue();
+    }catch(e){}
+  })();
   showReceipt(mov);
 }
 
@@ -3241,6 +3747,10 @@ function cotizLineSubtotal(l){
     if(!isFinite(m2v)||m2v<=0) m2v=Number(p.m2PerBox)||1;
     return cotizPrecioPorM2(p)*m2v;
   }
+  if(l.qtyMode==='piezas' && p && Number(p.piecesPerBox)>0){
+    var pz=Number(l.piezas)||0;
+    return (Number(l.price)||0)/Number(p.piecesPerBox)*pz;
+  }
   var q=Math.max(1,parseInt(l.qty,10)||1);
   return (Number(l.price)||0)*q;
 }
@@ -3261,6 +3771,10 @@ function cotizCajasParaVenta(l){
     var m2=Number(l.m2)||0;
     return Math.max(1,Math.ceil(m2/Number(p.m2PerBox)-1e-9));
   }
+  if(l.qtyMode==='piezas' && p && Number(p.piecesPerBox)>0){
+    var pz=Number(l.piezas)||0;
+    return Math.max(1,Math.ceil(pz/Number(p.piecesPerBox)-1e-9));
+  }
   return Math.max(1,parseInt(l.qty,10)||1);
 }
 
@@ -3275,6 +3789,7 @@ function cotizPushHistorial(q, label, detalle){
   if(q.historial.length>80) q.historial=q.historial.slice(0,80);
 }
 function cotizVolverLista(){
+  try{ window.__limajeSqlCore.presenceStop(); }catch(e){}
   cotizEditId=null;
   cotizLineas=[];
   cotizFotoSesion=null;
@@ -3361,6 +3876,11 @@ function cotizAbrir(id){
   }).join(''):'<span style="color:var(--text2);">Sin registros.</span>';
   cotizRenderLineas();
   cotizBuscarProductos();
+  var ban=document.getElementById('cotizPresenceBanner');if(ban) ban.style.display='none';
+  if(q.sqlId&&window.__limajeSqlCore&&currentUser){
+    window.__limajeSqlCore.presenceStart('cotizacion',q.sqlId,(currentUser.label||currentUser.username||''));
+    setTimeout(function(){ limajeOnPresenceRemote(); },400);
+  }
 }
 function cotizOnFoto(inp){
   var f=inp.files&&inp.files[0]; if(!f) return;
@@ -3454,6 +3974,7 @@ function cotizUpdateLine(lid, field, val){
   if(field==='qty') L.qty=Math.max(1,parseInt(val,10)||1);
   if(field==='price') L.price=Math.max(0,parseFloat(val)||0);
   if(field==='m2') L.m2=Math.max(0.01,parseFloat(val)||0.01);
+  if(field==='piezas') L.piezas=Math.max(1,parseInt(val,10)||1);
   cotizRenderLineas();
 }
 function cotizSetLineMode(lid, mode){
@@ -3466,12 +3987,17 @@ function cotizSetLineMode(lid, mode){
     var qc=Math.max(1,parseInt(L.qty,10)||1);
     L.qtyMode='m2';
     L.m2=qc*Number(p.m2PerBox);
-    delete L.qty;
+    delete L.qty;delete L.piezas;
+  }else if(mode==='piezas'){
+    var qc2=Math.max(1,parseInt(L.qty,10)||1);
+    L.qtyMode='piezas';
+    L.piezas=qc2*Number(p.piecesPerBox);
+    delete L.qty;delete L.m2;
   }else{
     var m2v=Number(L.m2)||Number(p.m2PerBox);
     L.qtyMode='cajas';
     L.qty=Math.max(1,Math.ceil(m2v/Number(p.m2PerBox)-1e-9));
-    delete L.m2;
+    delete L.m2;delete L.piezas;
   }
   cotizRenderLineas();
 }
@@ -3497,11 +4023,16 @@ function cotizRenderLineas(){
           cantCell=(ed?'<input type="number" min="1" style="width:56px;" value="'+(l.qty||1)+'" onchange="cotizUpdateLine('+l.lineId+',\'qty\',this.value)">':(l.qty||1));
         }else if(cotizProductSupportsM2(p)){
           var br=cotizLineM2Breakdown(l);
-          modoCell=ed?'<select style="max-width:100px;font-size:11px;" onchange="cotizSetLineMode('+l.lineId+',this.value)"><option value="m2" '+(l.qtyMode==='m2'?'selected':'')+'>m²</option><option value="cajas" '+((l.qtyMode||'cajas')==='cajas'?'selected':'')+'>Cajas</option></select>':(l.qtyMode==='m2'?'m²':'Cajas');
+          modoCell=ed?'<select style="max-width:100px;font-size:11px;" onchange="cotizSetLineMode('+l.lineId+',this.value)"><option value="m2" '+(l.qtyMode==='m2'?'selected':'')+'>m²</option><option value="piezas" '+(l.qtyMode==='piezas'?'selected':'')+'>Pzs</option><option value="cajas" '+((l.qtyMode||'cajas')==='cajas'?'selected':'')+'>Cajas</option></select>':(l.qtyMode==='m2'?'m²':l.qtyMode==='piezas'?'Pzs':'Cajas');
           if((l.qtyMode||'cajas')==='m2'){
             cantCell=(ed?'<input type="number" min="0.01" step="0.01" style="width:72px;" value="'+(Number(l.m2)||0).toFixed(2)+'" onchange="cotizUpdateLine('+l.lineId+',\'m2\',this.value)">':(Number(l.m2)||0).toFixed(2))+' m²';
             if(br) cantCell+='<div style="font-size:10px;color:var(--text2);margin-top:2px;">≈ '+br.cajasExact.toFixed(2)+' cajas · '+Math.round(br.piezas)+' pzs · mín. '+br.cajasMin+' cj. entrega</div>';
             puHint='<div style="font-size:10px;color:var(--text2);">'+fmt(p.price)+'/caja · '+fmt(cotizPrecioPorM2(p))+'/m²</div>';
+          }else if((l.qtyMode||'cajas')==='piezas'){
+            cantCell=(ed?'<input type="number" min="1" step="1" style="width:56px;" value="'+(parseInt(l.piezas,10)||1)+'" onchange="cotizUpdateLine('+l.lineId+',\'piezas\',this.value)">':(parseInt(l.piezas,10)||1))+' pzs';
+            var cjP=Math.max(1,Math.ceil((Number(l.piezas)||0)/Number(p.piecesPerBox)-1e-9));
+            cantCell+='<div style="font-size:10px;color:var(--text2);margin-top:2px;">≈ '+cjP+' cj. · '+((Number(l.piezas)||0)/Number(p.piecesPerBox)*Number(p.m2PerBox)).toFixed(2)+' m²</div>';
+            puHint='<div style="font-size:10px;color:var(--text2);">'+fmt((Number(p.price)||0)/Number(p.piecesPerBox))+'/pz</div>';
           }else{
             cantCell=(ed?'<input type="number" min="1" style="width:56px;" value="'+(l.qty||1)+'" onchange="cotizUpdateLine('+l.lineId+',\'qty\',this.value)">':(l.qty||1))+' cj.';
             var qc=parseInt(l.qty,10)||1;
@@ -3522,7 +4053,7 @@ function cotizRenderLineas(){
   var fin=Math.max(0,sub-des);
   tot.textContent='Subtotal: '+fmt(sub)+(des>0?' · Descuento: '+fmt(des):'')+' · Total: '+fmt(fin);
 }
-function cotizGuardar(){
+async function cotizGuardar(){
   if(!canSell()) return;
   var cliente=(document.getElementById('cotizCliente').value||'').trim();
   if(!cliente) return alert2('Indique el cliente','error');
@@ -3536,27 +4067,148 @@ function cotizGuardar(){
   if(descuento>sub) return alert2('El descuento no puede superar el subtotal','error');
   var total=Math.max(0,sub-descuento);
   var list=getCotizaciones();
+  var prev=null, idx=-1;
   if(cotizEditId){
-    var idx=list.findIndex(function(x){ return x.id===cotizEditId; });
+    idx=list.findIndex(function(x){ return x.id===cotizEditId; });
     if(idx<0) return;
-    var prev=list[idx];
-    if(prev.status==='pedido') return alert2('No se puede editar un pedido cerrado','error');
+    prev=list[idx];
+    if(!cotizEsEditable(prev)) return alert2('Cotización no editable','error');
+  }
+  var base={
+    cliente:cliente,nit:nit,telefono:telefono,nota:nota,status:status,descuento:descuento,subtotal:sub,total:total,
+    items:JSON.parse(JSON.stringify(cotizLineas)), fotoDataUrl:null, ts:Date.now(), date:today(),
+    actualizadoPor:(currentUser&&currentUser.username)||'sistema', elaboradoPor:(currentUser&&currentUser.username)||'sistema',
+    elaboradoRol:(currentUser&&currentUser.role)||'', elaboradoLabel:(currentUser&&currentUser.label)||''
+  };
+  if(cotizEditId){
     var det='Items: '+cotizLineas.length+'; Total '+fmt(total)+'; Estado '+cotizEstadoLabel(status);
-    list[idx]=Object.assign({},prev,{ cliente:cliente,nit:nit,telefono:telefono,nota:nota,status:status,descuento:descuento,subtotal:sub,total:total,items:JSON.parse(JSON.stringify(cotizLineas)),fotoDataUrl:null, ts:Date.now(), date:today(), actualizadoPor:(currentUser&&currentUser.username)||'sistema', elaboradoPor:(currentUser&&currentUser.username)||'sistema', elaboradoRol:(currentUser&&currentUser.role)||'', elaboradoLabel:(currentUser&&currentUser.label)||'' });
+    list[idx]=Object.assign({},prev,base);
     cotizPushHistorial(list[idx],'Guardado',det);
   }else{
     var nid=nextCotizacionId();
-    var nq={ id:nid, ts:Date.now(), date:today(), cliente:cliente,nit:nit,telefono:telefono,nota:nota,status:status,descuento:descuento,subtotal:sub,total:total,
-      items:JSON.parse(JSON.stringify(cotizLineas)), fotoDataUrl:null, historial:[], creadoPor:(currentUser&&currentUser.username)||'sistema', actualizadoPor:(currentUser&&currentUser.username)||'sistema', elaboradoPor:(currentUser&&currentUser.username)||'sistema', elaboradoRol:(currentUser&&currentUser.role)||'', elaboradoLabel:(currentUser&&currentUser.label)||'' };
+    var nq=Object.assign({ id:nid, historial:[], creadoPor:(currentUser&&currentUser.username)||'sistema' },base);
     cotizPushHistorial(nq,'Creación','Cotización creada · '+fmt(total));
     list.push(nq);
     cotizEditId=nid;
     document.getElementById('cotizEditorTitle').textContent='Cotización #'+nid;
   }
+  var ri=list.findIndex(function(x){ return x.id===cotizEditId; });
+  if(ri<0){ alert2('Error al ubicar cotización en memoria','error'); return; }
+  var row=list[ri];
+  var LM=window.__limajeSqlCore;
+  var sb=window.__limajeSupabase;
+  if(sb&&LM){
+    try{
+      await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+      var enriched=LM.enrichCotizItemsForSql(cotizLineas, getProdById, cotizLineSubtotal);
+      var payload={
+        id:row.sqlId||null,
+        cliente:cliente,nit:nit,telefono:telefono,nota:nota,status:status,descuento:descuento,subtotal:sub,total:total,
+        items:enriched,
+        historial:row.historial||[],
+        fecha:row.date||today(),
+        ts_millis:row.ts,
+        creado_por:row.creadoPor||'', actualizado_por:row.actualizadoPor||'',
+        elaborado_por:row.elaboradoPor||'', elaborado_rol:row.elaboradoRol||'', elaborado_label:row.elaboradoLabel||'',
+        periodo_granularidad:'mes'
+      };
+      var up=await LM.upsertCotizacionRpc(payload);
+      row.sqlId=up.id;
+      if(up.numero_serial!=null){ row.id=up.numero_serial; cotizEditId=up.numero_serial; document.getElementById('cotizEditorTitle').textContent='Cotización #'+up.numero_serial; }
+      var prevSt=prev&&prev.status;
+      if(prevSt==='pendiente'&&status!=='pendiente'&&row.sqlId)
+        await LM.liberarReservaRpc(row.sqlId);
+      if(status==='pendiente'&&row.sqlId){
+        var lines=enriched.filter(function(l){ return l.productId&&!l.sinInventario; }).map(function(l){
+          return { product_id:String(l.productId), location_code:l.locationCode||'LOCAL', cajas:Number(l.cajasInventario)||0 };
+        });
+        if(lines.length) await LM.reservarRpc(row.sqlId, lines);
+      }
+      list[ri]=row;
+    }catch(err){
+      console.error(err);
+      alert2('Nube: '+(err.message||err),'error');
+      return;
+    }
+  }
   DB.set('cotizaciones',list);
   logAudit('cotizacion_guardar','#'+(cotizEditId)+' '+cliente+' '+status,'cotizaciones',cotizEditId);
+  try{ await limajeRefreshStockMap(); }catch(e){}
+  try{ await flushPersistQueue(); }catch(e2){}
   alert2('Cotización guardada ✅');
   cotizAbrir(cotizEditId);
+}
+function aplicarVentaDesdeCotizacion(ventaJson){
+  if(!ventaJson||!ventaJson.items) return;
+  var mvs=getMovements();
+  mvs.push({
+    id:ventaJson.id,type:'venta',ts:ventaJson.ts||nowTs(),date:ventaJson.date||today(),
+    subtotal:ventaJson.subtotal,descuento:ventaJson.descuento||0,total:ventaJson.total,
+    pago:ventaJson.pago||'Efectivo',note:ventaJson.note||'',nit:ventaJson.nit||'',numeroFactura:ventaJson.numeroFactura||'',
+    vendedor:ventaJson.vendedor||'',
+    items:(ventaJson.items||[]).map(function(it){
+      return { lineId:it.lineId||Date.now()+Math.random(), id:it.id, code:it.code, name:it.name, price:Number(it.price)||0,
+        priceCost:Number(it.priceCost)||0, priceLimit:Number(it.priceLimit)||0, qty:Number(it.qty)||1, locationCode:it.locationCode||'LOCAL' };
+    })
+  });
+  DB.set('movements',mvs);
+  var prods=getProducts();
+  (ventaJson.items||[]).forEach(function(it){
+    var pid=it.id;
+    if(pid==null||pid===''||Number(pid)<0) return;
+    var idx=prods.findIndex(function(p){ return p.id===pid; });
+    if(idx<0) return;
+    var loc=it.locationCode||'LOCAL';
+    var q=Number(it.qty)||0;
+    ensureStockByLoc(prods[idx]);
+    prods[idx].stockByLocation[loc]=Math.max(0,(Number(prods[idx].stockByLocation[loc])||0)-q);
+    recomputeStockTotal(prods[idx]);
+    deductLotsFIFO(pid,loc,q);
+  });
+  DB.set('products',prods);
+  logAudit('venta_cotiz','Venta #'+ventaJson.id+' desde cotización','ventas',ventaJson.id);
+}
+async function cotizConfirmarDesdeLista(id){
+  if(!canSell()) return;
+  var q=getCotizaciones().find(function(x){ return x.id===id; });
+  if(!q){ alert2('No encontrada','error'); return; }
+  if(!q.sqlId){ alert2('Guarde la cotización con conexión a la nube para asignar ID de servidor.','error'); return; }
+  if(q.status!=='pendiente'&&q.status!=='pendiente_abastecimiento'){ alert2('Solo se confirman cotizaciones pendientes o en abastecimiento.','error'); return; }
+  var LM=window.__limajeSqlCore;
+  try{
+    await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+    var meta={
+      pago:'Efectivo', next_venta_id: nextMovementId(), date:today(), ts: nowTs(),
+      note:q.cliente, nit:q.nit||'', numeroFactura:'', vendedor:(currentUser&&currentUser.username)||''
+    };
+    var r=await LM.confirmarCotizacionRpc(q.sqlId, meta);
+    if(r&&r.ok===false){ alert2(r.error||'No confirmada','error'); return; }
+    if(r.status==='pendiente_abastecimiento'){
+      var list2=getCotizaciones().map(function(c){ return c.id===id?Object.assign({},c,{ status:'pendiente_abastecimiento' }):c; });
+      DB.set('cotizaciones',list2);
+      await limajeRefreshStockMap();
+      await flushPersistQueue();
+      alert2('Stock insuficiente: en cola de abastecimiento.','error');
+      renderCotizacionesList();
+      return;
+    }
+    aplicarVentaDesdeCotizacion(r.venta);
+    var list3=getCotizaciones().map(function(c){
+      return c.id===id?Object.assign({},c,{ status:'convertida', ventaId:r.venta_id }):c;
+    });
+    DB.set('cotizaciones',list3);
+    await limajeRefreshStockMap();
+    await flushPersistQueue();
+    alert2('Convertida · Venta #'+r.venta_id,'success');
+    renderCotizacionesList();
+  }catch(e){
+    console.error(e);
+    alert2(String(e.message||e),'error');
+  }
+}
+function cotizPromptConfirmar(id){
+  if(!confirm('¿Confirmar esta cotización? Se generará la venta y se descontará inventario si hay stock.')) return;
+  void cotizConfirmarDesdeLista(id);
 }
 function pdfDateParts(){
   var d=new Date();
@@ -4002,29 +4654,54 @@ function cotizCargarEnVenta(){
   if(miss.length) msg+=' Omitidos: '+miss.join(', ');
   alert2(msg);
 }
-function cotizEliminar(id){
+async function cotizEliminar(id){
   if(!canSell()) return;
   if(!confirm('¿Eliminar esta cotización?')) return;
+  var q=getCotizaciones().find(function(x){ return x.id===id; });
+  if(q&&q.sqlId&&window.__limajeSupabase){
+    try{
+      if(q.status==='pendiente') await window.__limajeSqlCore.liberarReservaRpc(q.sqlId);
+      await window.__limajeSupabase.from('limaje_cotizaciones').delete().eq('id',q.sqlId);
+    }catch(e){ console.warn(e); }
+  }
   var list=getCotizaciones().filter(function(x){ return x.id!==id; });
   DB.set('cotizaciones',list);
   logAudit('cotizacion_eliminar','#'+id,'cotizaciones',id);
+  try{ await limajeRefreshStockMap(); await flushPersistQueue(); }catch(e2){}
   if(cotizEditId===id) cotizVolverLista();
   else renderCotizacionesList();
   alert2('Eliminada','error');
 }
+function cotizBadgeClass(st){
+  if(st==='convertida'||st==='pedido') return 'badge-teal';
+  if(st==='pendiente'||st==='en_espera') return 'badge-amber';
+  if(st==='pendiente_abastecimiento') return 'badge-red';
+  if(st==='confirmada') return 'badge-green';
+  if(st==='cancelada'||st==='rechazada') return 'badge-purple';
+  return 'badge-purple';
+}
 function renderCotizacionesList(){
   var wrap=document.getElementById('cotizacionesTable'); if(!wrap) return;
   var f=document.getElementById('cotizFiltroEstado').value;
-  var list=getCotizaciones().slice().sort(function(a,b){ return b.id-a.id; });
-  if(f) list=list.filter(function(x){ return x.status===f; });
+  var list=getCotizaciones().slice().sort(function(a,b){ return (Number(b.id)||0)-(Number(a.id)||0); });
+  if(f) list=list.filter(function(x){
+    if(f==='en_espera') return x.status==='en_espera'||x.status==='pendiente';
+    return x.status===f;
+  });
   if(!list.length){
     wrap.innerHTML='<p style="padding:16px;color:var(--text2);">No hay cotizaciones. Cree una nueva.</p>';
     return;
   }
   wrap.innerHTML='<table><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Elaborado por</th><th>Estado</th><th>Total</th><th></th></tr></thead><tbody>'+
     list.map(function(c){
-      var badge=c.status==='pedido'?'badge-teal':c.status==='en_espera'?'badge-amber':c.status==='confirmada'?'badge-green':'badge-purple';
-      return '<tr><td>'+c.id+'</td><td style="font-size:11px">'+(c.date||'')+'</td><td>'+escapeHtmlLot(c.cliente||'')+'</td><td style="font-size:11px;color:var(--text2);">'+escapeHtmlLot(cotizElaboradoText(c))+'</td><td><span class="badge '+badge+'">'+cotizEstadoLabel(c.status)+'</span></td><td>'+fmt(c.total||0)+'</td><td style="white-space:nowrap;"><button type="button" class="btn btn-sm btn-secondary" onclick="cotizAbrir('+c.id+')">Abrir</button> <button type="button" class="btn btn-sm" onclick="cotizPdfDesdeList('+c.id+')">PDF</button> '+(c.status!=='pedido'?'<button type="button" class="btn btn-sm btn-danger" onclick="cotizEliminar('+c.id+')">Eliminar</button>':'')+'</td></tr>';
+      var st=c.status;
+      var badge=cotizBadgeClass(st);
+      var canConf=canSell()&&(st==='pendiente'||st==='pendiente_abastecimiento');
+      var delOk=st!=='pedido'&&st!=='convertida';
+      return '<tr><td>'+c.id+'</td><td style="font-size:11px">'+(c.date||'')+'</td><td>'+escapeHtmlLot(c.cliente||'')+'</td><td style="font-size:11px;color:var(--text2);">'+escapeHtmlLot(cotizElaboradoText(c))+'</td><td><span class="badge '+badge+'">'+cotizEstadoLabel(st)+'</span></td><td>'+fmt(c.total||0)+'</td><td style="white-space:nowrap;">'+
+        (canConf?'<button type="button" class="btn btn-sm btn-success" onclick="cotizPromptConfirmar('+c.id+')">Confirmar</button> ':'')+
+        '<button type="button" class="btn btn-sm btn-secondary" onclick="cotizAbrir('+c.id+')">Abrir</button> <button type="button" class="btn btn-sm" onclick="cotizPdfDesdeList('+c.id+')">PDF</button> '+
+        (delOk?'<button type="button" class="btn btn-sm btn-danger" onclick="cotizEliminar('+c.id+')">Eliminar</button>':'')+'</td></tr>';
     }).join('')+'</tbody></table>';
 }
 function cotizPdfDesdeList(id){
@@ -4040,7 +4717,7 @@ function cotizPdfDesdeList(id){
 // ============================================================
 // SCHEMA VERSION + MIGRATION SYSTEM
 // ============================================================
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 // Historia de versiones:
 // v1: estructura básica (categories, products, movements, cartera)
 // v2: products con priceCost, priceLimit; movements con subtotal, descuento, vendedor; cartera con historial
@@ -4050,6 +4727,7 @@ const SCHEMA_VERSION = 9;
 // v7: gestión de lotes por producto (cajas), presets cerámica Samboro/Verona/Brasilia
 // v8: registro de PDFs exportados (documentosExportados) por mes/año
 // v9: vaciar movimientos/cartera/registro PDF; renumerar productos, cotizaciones y lotes desde 1; alinear numeración ventas/cotiz
+// v10: estados cotización alineados (pendiente / convertida / abastecimiento); campos piezas en líneas
 
 const MIGRATIONS = {
   // v1 → v2: agregar campos de precio y cartera
@@ -4164,6 +4842,12 @@ const MIGRATIONS = {
     lots.forEach(function(l,i){ l.id=i+1; });
     data.inventoryLots = lots;
     console.log('LIMAJE esquema v9: movimientos y cartera vaciados; registro de PDFs limpiado; productos, cotizaciones y lotes renumerados desde 1.');
+    return data;
+  },
+  10: function(data){
+    (data.cotizaciones||[]).forEach(function(q){
+      if(q.status==='en_espera') q.status='pendiente';
+    });
     return data;
   }
 };
