@@ -329,6 +329,8 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     <div class="form-group"><label>Correo electrónico</label><input type="email" id="loginUser" placeholder="ejemplo@correo.com" autocomplete="username"></div>
     <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
     <button type="button" class="btn btn-full" id="btnLimajeLogin">Ingresar al Sistema</button>
+    <p style="text-align:center;margin-top:12px;"><a href="#" id="linkLimajeForgotPass" style="font-size:12px;color:var(--brand-blue);text-decoration:underline;">¿Olvidó su contraseña?</a></p>
+    <p style="text-align:center;margin-top:6px;color:var(--text2);font-size:11px;">Escriba su correo arriba y pulse aquí; recibirá un enlace por email (revise spam).</p>
     <p style="text-align:center;margin-top:14px;"><a href="#" id="linkLimajeIntro" style="font-size:12px;color:var(--text2);text-decoration:underline;">Ver introducción</a></p>
   </div>
 </div>
@@ -755,6 +757,9 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     <!-- USUARIOS -->
     <div class="page" id="page-usuarios">
       <div class="page-header"><h2>👤 Usuarios del Sistema</h2><div id="usersAddBtn"></div></div>
+      <div class="card" style="margin-bottom:14px;background:var(--teal-xs);border-color:var(--border);">
+        <p style="font-size:13px;color:var(--text);line-height:1.5;margin:0;"><strong>Importante:</strong> aquí están quienes <strong>inician sesión</strong> con correo y contraseña (rol: vendedor, admin, configurador…). No es el módulo <strong>👷 Trabajadores</strong> (ese es solo nómina / pagos internos). Para cambiar roles use el botón <strong>Rol</strong> (solo administrador o súper admin). Contraseña de <em>otra</em> persona: use Supabase → <strong>Authentication → Users</strong> o pídale que use <strong>¿Olvidó su contraseña?</strong> en el login.</p>
+      </div>
       <div class="card"><div class="card-title">Usuarios Registrados</div><div class="table-wrap" id="usersTable"></div></div>
       <div class="card">
         <div class="card-title">🗄️ Exportar / Importar Datos (JSON)</div>
@@ -1257,12 +1262,49 @@ async function doLogin(){
     if(el) el.innerHTML='<div class="alert alert-error">Ingrese correo y contraseña</div>';
     return;
   }
-  var r=await window.__limajeSupabase.auth.signInWithPassword({ email:email, password:password });
+  var r;
+  try{
+    r=await window.__limajeSupabase.auth.signInWithPassword({ email:email, password:password });
+  }catch(err){
+    console.error(err);
+    var em=String(err&&err.message||err||'');
+    var hint='Compruebe en <code>limaje-config.js</code> que <strong>Project URL</strong> y <strong>anon key</strong> se copiaron de Supabase → Project Settings → API (mismo proyecto). Si la consola dice <code>ERR_NAME_NOT_RESOLVED</code>, esa URL <code>….supabase.co</code> ya no existe: cree proyecto nuevo o corrija el ref.';
+    if(/fetch|network|failed/i.test(em)) hint+=' Conexión rechazada o dominio incorrecto.';
+    if(el) el.innerHTML='<div class="alert alert-error">\u274c No se pudo conectar con Supabase. '+hint+'</div>';
+    return;
+  }
   if(r.error){
     if(el) el.innerHTML='<div class="alert alert-error">\u274c '+escapeHtmlLot(String(r.error.message||r.error))+'</div>';
     return;
   }
   if(el) el.innerHTML='';
+}
+async function requestPasswordReset(){
+  if(window.__limajeBootPromise){
+    try{ await window.__limajeBootPromise; }catch(e){ console.error(e); }
+  }
+  const el=document.getElementById('loginAlert');
+  const email=(document.getElementById('loginUser').value||'').trim();
+  if(!window.__limajeSupabase){
+    if(el) el.innerHTML='<div class="alert alert-error">Configure primero <code>limaje-config.js</code>.</div>';
+    return;
+  }
+  if(!email){
+    if(el) el.innerHTML='<div class="alert alert-error">Escriba su correo en el campo de arriba y vuelva a pulsar «¿Olvidó su contraseña?».</div>';
+    return;
+  }
+  var redir=window.location.href.split('#')[0];
+  try{
+    var pr=await window.__limajeSupabase.auth.resetPasswordForEmail(email,{ redirectTo:redir });
+    if(pr.error){
+      if(el) el.innerHTML='<div class="alert alert-error">'+escapeHtmlLot(String(pr.error.message||pr.error))+'</div>';
+      return;
+    }
+    if(el) el.innerHTML='<div class="alert alert-success">Si ese correo está registrado, le llegará un enlace para elegir contraseña nueva. Revise carpeta de spam. En Supabase debe estar su URL en Authentication → URL Configuration → Redirect URLs.</div>';
+  }catch(err){
+    console.error(err);
+    if(el) el.innerHTML='<div class="alert alert-error">No se pudo enviar el correo. Revise conexión y configuración SMTP de Supabase (Authentication → Providers → Email).</div>';
+  }
 }
 async function logout(){
   if(window.__limajeSupabase) await window.__limajeSupabase.auth.signOut();
@@ -4611,6 +4653,8 @@ function bindLimajeAuthUi(){
   window.__limajeAuthUiBound=true;
   var b=document.getElementById('btnLimajeLogin');
   if(b) b.addEventListener('click',function(){ void doLogin(); });
+  var fp=document.getElementById('linkLimajeForgotPass');
+  if(fp) fp.addEventListener('click',function(e){ e.preventDefault(); void requestPasswordReset(); });
   var li=document.getElementById('linkLimajeIntro');
   if(li) li.addEventListener('click',function(e){ e.preventDefault(); showIntro(false); });
   var ic=document.getElementById('btnIntroContinue');
