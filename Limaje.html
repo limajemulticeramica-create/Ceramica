@@ -850,12 +850,11 @@ async function flushPersistQueue(){
   _dirtyKeys.clear();
   _persistTimer=null;
   var allowed=filterPersistKeys(keys);
-  keys.forEach(function(k){
-    if(allowed.indexOf(k)<0){
-      if(!window.__limajeKvSkipLog) window.__limajeKvSkipLog=Object.create(null);
-      if(!window.__limajeKvSkipLog[k]){ window.__limajeKvSkipLog[k]=1; console.warn('limaje_kv: clave no persistida por rol actual:',k); }
-    }
-  });
+  var skipped=keys.filter(function(k){ return allowed.indexOf(k)<0; });
+  if(skipped.length&&!window.__limajeKvRoleHintOnce){
+    window.__limajeKvRoleHintOnce=1;
+    console.info('LIMAJE: con el rol actual no se suben a la nube algunas claves (ej. catálogo completo). Es normal para vendedor/bodeguero; admin/configurador sí sincronizan todo.');
+  }
   if(allowed.length===0) return;
   var rows=allowed.map(function(k){ return { key:k, value:_kvCache[k], updated_at:new Date().toISOString() }; });
   try{
@@ -997,27 +996,34 @@ function exitAppSessionUI(){
 async function applyProfile(user){
   var sb=window.__limajeSupabase;
   var r=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
-  if(r.error) console.error(r.error);
+  if(r.error) throw new Error(r.error.message||String(r.error.code||r.error));
   var prof=r.data;
   if(!prof){
     var meta=user.user_metadata||{};
-    /* No enviar role: el trigger SQL o un UPDATE manual definen configurador; no pisar con vendedor */
-    var ins=await sb.from('profiles').upsert({
+    /* INSERT evita upsert que a veces dispara UPDATE+RLS y 500; si ya existe fila (trigger), re-leemos */
+    var ins=await sb.from('profiles').insert({
       id:user.id,
       email:user.email||null,
       username:(user.email||'').split('@')[0],
       full_name:meta.full_name||user.email||'Usuario',
       intro_seen:false
-    },{ onConflict:'id' }).select().single();
-    if(ins.error) console.error(ins.error);
-    prof=ins.data;
+    }).select().single();
+    if(ins.error){
+      var c=String(ins.error.code||'');
+      var dup=/23505|duplicate/i.test(c)||/duplicate key/i.test(String(ins.error.message||''));
+      if(dup){
+        var r2=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+        if(r2.error) throw new Error(r2.error.message||String(r2.error));
+        prof=r2.data;
+      }else throw new Error(ins.error.message||String(ins.error));
+    }else prof=ins.data;
   }
   currentUser={
     id:user.id,
     email:user.email||'',
     username:(prof&&prof.username)||(user.email||'').split('@')[0],
     label:(prof&&prof.full_name)||(prof&&prof.username)||user.email||'Usuario',
-    role:(prof&&prof.role)||'vendedor'
+    role:normalizeAppRole(prof&&prof.role)
   };
   return prof;
 }
@@ -1181,6 +1187,12 @@ function inferTileSpecs(name){
 function roleLabel(role){
   var m={admin:'Administrador',configurador:'Súper admin (configurador)',contador:'Contador',vendedor:'Vendedor',bodeguero:'Bodeguero',auxiliar_bodega:'Auxiliar de bodega'};
   return m[role]||role;
+}
+/** Iguala el rol de profiles (trim/minúsculas) para menú y migraciones; si no coincide, vendedor. */
+function normalizeAppRole(role){
+  var x=String(role==null?'':role).trim().toLowerCase();
+  var ok=['admin','configurador','contador','vendedor','bodeguero','auxiliar_bodega'];
+  return ok.indexOf(x)>=0?x:'vendedor';
 }
 function canVoidMovement(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador'); }
 function canManageUsers(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'); }
@@ -2982,7 +2994,7 @@ async function submitEditProfileRole(){
   if(u.error){ if(errEl){ errEl.textContent=u.error.message; errEl.style.display='block'; } return; }
   closeModal();
   if(currentUser&&String(currentUser.id)===String(userId)){
-    currentUser.role=role;
+    currentUser.role=normalizeAppRole(role);
     setupNav();
   }
   logAudit('editar_rol_perfil',userId+' → '+role,'usuarios',userId);
@@ -4164,7 +4176,7 @@ function migrateData(){
     if(rr!=='admin'&&rr!=='configurador'&&rr!=='contador'){
       if(!_migrateSchemaWarned){
         _migrateSchemaWarned=true;
-        alert2('Actualización de datos pendiente: inicie sesión como administrador o contador una vez para completar la migración del esquema.','error');
+        alert2('Actualización de datos pendiente: debe entrar una vez con cuenta de administrador, súper admin (configurador) o contador para migrar datos. Si ya lo es y sigue este aviso: en Supabase → Table Editor → profiles verifique que la columna role sea exactamente admin, configurador o contador (sin espacios); cierre sesión y vuelva a entrar.','error');
       }
       return;
     }
