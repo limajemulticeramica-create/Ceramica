@@ -18,16 +18,16 @@
   L.lineCajasInventario = function (l, getProdById) {
     if (!l || l.sinInventario || !l.productId) return 0;
     var p = getProdById(l.productId);
-    if (!p) return Math.max(1, parseInt(l.qty, 10) || 1);
+    if (!p) return Math.max(0, Number(l.qty) || 0);
     if (l.qtyMode === 'm2' && Number(p.m2PerBox) > 0) {
       var m2 = Number(l.m2) || 0;
-      return Math.max(1, Math.ceil(m2 / Number(p.m2PerBox) - 1e-9));
+      return m2 > 0 ? m2 / Number(p.m2PerBox) : 0;
     }
     if (l.qtyMode === 'piezas' && Number(p.piecesPerBox) > 0) {
       var pz = Number(l.piezas) || 0;
-      return Math.max(1, Math.ceil(pz / Number(p.piecesPerBox) - 1e-9));
+      return pz > 0 ? pz / Number(p.piecesPerBox) : 0;
     }
-    return Math.max(1, parseInt(l.qty, 10) || 1);
+    return Math.max(0, Number(l.qty) || 0);
   };
 
   L.enrichCotizItemsForSql = function (lineas, getProdById, cotizSubtotalLine) {

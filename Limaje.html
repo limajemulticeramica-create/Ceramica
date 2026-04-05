@@ -1204,6 +1204,17 @@ function recomputeStockTotal(p){
   ensureStockByLoc(p);
   p.stock=(Number(p.stockByLocation.LOCAL)||0)+(Number(p.stockByLocation.BOD1)||0)+(Number(p.stockByLocation.BOD2)||0);
 }
+/** Comparación de stock con tolerancia (cajas fraccionarias) */
+var STOCK_EPS=1e-6;
+function stockCovers(disponible,necesita){ return (Number(disponible)||0)+STOCK_EPS>=(Number(necesita)||0); }
+/** Muestra cajas con decimales solo si hace falta */
+function fmtStockCajas(x){
+  var n=Number(x)||0;
+  if(Math.abs(n)<STOCK_EPS) return '0';
+  if(Math.abs(n-Math.round(n))<STOCK_EPS) return String(Math.round(n));
+  var s=n.toFixed(3);
+  return s.replace(/\.?0+$/,'');
+}
 function stockAtLoc(p,code){
   ensureStockByLoc(p);
   return Number(p.stockByLocation[code])||0;
@@ -1220,7 +1231,7 @@ function rebuildLotsFromProduct(p){
   saveLots(lots);
 }
 function addQtyToLots(pId,loc,qty,lotLabel){
-  if(qty<=0) return;
+  if((Number(qty)||0)<=STOCK_EPS) return;
   var lots=getLots();
   var label=lotLabel||('AJUSTE '+today());
   var lot=lots.find(function(l){ return l.productId===pId&&l.locationCode===loc&&l.lotCode===label; });
@@ -1232,23 +1243,30 @@ function addQtyToLots(pId,loc,qty,lotLabel){
   saveLots(lots);
 }
 function deductLotsFIFO(pId,loc,qty){
-  if(qty<=0) return;
+  var need=Number(qty)||0;
+  if(need<=STOCK_EPS) return;
   var all=getLots();
-  var candidates=all.filter(function(l){ return l.productId===pId&&l.locationCode===loc&&l.qty>0; })
+  var candidates=all.filter(function(l){ return l.productId===pId&&l.locationCode===loc&&(Number(l.qty)||0)>STOCK_EPS; })
     .sort(function(a,b){ return (a.receivedAt||0)-(b.receivedAt||0); });
-  var rem=qty;
+  var rem=need;
   candidates.forEach(function(lot){
-    if(rem<=0) return;
+    if(rem<=STOCK_EPS) return;
     var idx=all.findIndex(function(x){ return x.id===lot.id; });
     if(idx<0) return;
-    var take=Math.min(all[idx].qty,rem);
-    all[idx].qty-=take;
+    var qLot=Number(all[idx].qty)||0;
+    if(qLot<=STOCK_EPS) return;
+    var take=Math.min(qLot,rem);
+    all[idx].qty=qLot-take;
     rem-=take;
+  });
+  all=all.filter(function(l){
+    if(l.productId===pId&&l.locationCode===loc) return (Number(l.qty)||0)>STOCK_EPS;
+    return true;
   });
   saveLots(all);
 }
 function restoreLotsFIFO(pId,loc,qty){
-  if(qty<=0) return;
+  if((Number(qty)||0)<=STOCK_EPS) return;
   addQtyToLots(pId,loc,qty,'INICIAL');
 }
 /** Suma cantidades de lotes (cajas) por bodega → stockByLocation del producto */
@@ -2209,7 +2227,7 @@ function renderInventario(){
   if(catF)prods=prods.filter(p=>p.categoryId==catF);
   if(locF) prods=prods.filter(p=>stockAtLoc(p,locF)>0);
   if(stkF==='low')prods=prods.filter(p=>{ensureStockByLoc(p);return p.stock<=5&&p.stock>0;});
-  if(stkF==='zero')prods=prods.filter(p=>{ensureStockByLoc(p);recomputeStockTotal(p);return p.stock===0;});
+  if(stkF==='zero')prods=prods.filter(p=>{ensureStockByLoc(p);recomputeStockTotal(p);return Math.abs(p.stock)<=STOCK_EPS;});
   const totalVal=prods.reduce((s,p)=>{ensureStockByLoc(p);recomputeStockTotal(p);return s+p.price*p.stock;},0);
   document.getElementById('inventarioTable').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
@@ -2221,7 +2239,7 @@ function renderInventario(){
       ensureStockByLoc(p);recomputeStockTotal(p);
       const m=p.priceCost>0?((p.price-p.priceCost)/p.priceCost*100).toFixed(0):'-';
       const sl=stockAtLoc(p,'LOCAL'),s1=stockAtLoc(p,'BOD1'),s2=stockAtLoc(p,'BOD2');
-      return`<tr class="${p.stock===0?'low-stock':''}">
+      return`<tr class="${Math.abs(p.stock)<=STOCK_EPS?'low-stock':''}">
         <td><span class="badge badge-teal">${escapeHtml(p.code)}</span></td>
         <td><strong>${escapeHtml(p.name)}</strong>${p.dimLabel?`<br><span style="font-size:10px;color:var(--text2);">${escapeHtml(p.dimLabel)}${p.m2PerBox?` · ${p.m2PerBox}m²/caja`:''}${p.piecesPerBox?` · ${p.piecesPerBox} pzs`:''}</span>`:''}</td>
         <td style="font-size:11px">${escapeHtml(p.clase||'—')}</td>
@@ -2230,8 +2248,8 @@ function renderInventario(){
         <td><span class="precio-limite">${fmt(p.priceLimit||0)}</span></td>
         <td><span class="precio-venta">${fmt(p.price)}</span></td>
         <td style="font-size:12px;color:var(--green);font-weight:700">${m}%</td>
-        <td>${sl}</td><td>${s1}</td><td>${s2}</td>
-        <td><span class="badge ${p.stock===0?'badge-red':p.stock<=5?'badge-amber':'badge-green'}">${p.stock}</span></td>
+        <td>${fmtStockCajas(sl)}</td><td>${fmtStockCajas(s1)}</td><td>${fmtStockCajas(s2)}</td>
+        <td><span class="badge ${Math.abs(p.stock)<=STOCK_EPS?'badge-red':p.stock<=5?'badge-amber':'badge-green'}">${fmtStockCajas(p.stock)}</span></td>
         <td style="color:var(--text2);font-size:11px">${fmt(p.price*p.stock)}</td>
         <td style="display:flex;gap:4px;flex-wrap:wrap;">
           ${canEditProductsMaster()?`<button class="btn btn-sm btn-secondary" onclick="openEditProduct(${p.id})">✏️</button>`:''}
@@ -2250,14 +2268,14 @@ function openAddStock(id){
     <p style="color:var(--text2);margin-bottom:12px;"><strong>${escapeHtml(p.name)}</strong> — Total: <span class="badge badge-teal">${p.stock}</span></p>
     <div class="form-group"><label>Bodega destino</label><select id="mStockLoc">${locOpts}</select></div>
     <div class="form-group"><label>Lote (opcional)</label><input id="mStockLot" placeholder="ej. 06 74 — vacío = ajuste genérico"></div>
-    <div class="form-group"><label>Cajas a agregar</label><input id="mStock" type="number" min="1" step="1" placeholder="0"></div>
+    <div class="form-group"><label>Cajas a agregar</label><input id="mStock" type="number" min="0.001" step="0.001" placeholder="0"></div>
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="addStock(${id})">✅ Agregar</button></div>`);
 }
 function addStock(id){
-  const qty=parseInt(document.getElementById('mStock').value,10)||0;
+  const qty=parseFloat(document.getElementById('mStock').value)||0;
   const loc=(document.getElementById('mStockLoc')&&document.getElementById('mStockLoc').value)||'LOCAL';
   const lotNote=(document.getElementById('mStockLot')&&document.getElementById('mStockLot').value.trim())||'';
-  if(qty<=0)return alert2('Ingrese cantidad válida','error');
+  if(qty<=STOCK_EPS)return alert2('Ingrese cantidad válida','error');
   const prods=getProducts();const idx=prods.findIndex(p=>p.id===id);
   if(idx<0)return;
   ensureStockByLoc(prods[idx]);
@@ -2292,19 +2310,19 @@ function openProductLotsManager(pid){
     var m2tot=m2>0?(caj*m2).toFixed(2):'—';
     var pztot=pz>0?String(caj*pz):'—';
     var lid=l.id;
-    return '<tr><td>'+(LOC_LABELS[l.locationCode]||l.locationCode)+'</td><td>'+escapeHtmlLot(l.lotCode)+'</td><td>'+(canEdit?'<input type="number" min="0" step="1" id="lotq_'+lid+'" value="'+caj+'" style="width:72px"/>':caj)+'</td><td style="font-size:11px">'+m2tot+(m2>0?' m²':'')+'</td><td style="font-size:11px">'+pztot+(pz>0?' pzs':'')+'</td><td style="font-size:11px;white-space:nowrap">'+(l.receivedAt?new Date(l.receivedAt).toLocaleString('es-GT'):'—')+'</td><td style="white-space:nowrap">'+(canEdit?'<button type="button" class="btn btn-sm btn-success" onclick="commitProductLotQty('+lid+','+pid+')">Guardar</button> <button type="button" class="btn btn-sm btn-danger" onclick="removeProductLot('+lid+','+pid+')">✕</button>':'—')+'</td></tr>';
+    return '<tr><td>'+(LOC_LABELS[l.locationCode]||l.locationCode)+'</td><td>'+escapeHtmlLot(l.lotCode)+'</td><td>'+(canEdit?'<input type="number" min="0" step="0.001" id="lotq_'+lid+'" value="'+caj+'" style="width:80px"/>':fmtStockCajas(caj))+'</td><td style="font-size:11px">'+m2tot+(m2>0?' m²':'')+'</td><td style="font-size:11px">'+pztot+(pz>0?' pzs':'')+'</td><td style="font-size:11px;white-space:nowrap">'+(l.receivedAt?new Date(l.receivedAt).toLocaleString('es-GT'):'—')+'</td><td style="white-space:nowrap">'+(canEdit?'<button type="button" class="btn btn-sm btn-success" onclick="commitProductLotQty('+lid+','+pid+')">Guardar</button> <button type="button" class="btn btn-sm btn-danger" onclick="removeProductLot('+lid+','+pid+')">✕</button>':'—')+'</td></tr>';
   }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text2);">Sin lotes. Use el formulario inferior o <strong>+Stock</strong>.</td></tr>';
-  var addForm=canEdit?'<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px;"><div style="font-weight:600;margin-bottom:8px;">Agregar lote (existencia en cajas)</div><div class="grid-3" style="gap:8px;align-items:flex-end;"><div class="form-group"><label>Bodega</label><select id="newLotLoc">'+LOC_CODES.map(function(c){ return '<option value="'+c+'">'+LOC_LABELS[c]+'</option>'; }).join('')+'</select></div><div class="form-group"><label>Código de lote</label><input id="newLotCode" placeholder="ej. 06 74"></div><div class="form-group"><label>Cajas</label><input id="newLotQty" type="number" min="0" step="1" value="0"></div></div><button type="button" class="btn btn-success" style="margin-top:8px;" onclick="addProductLotEntry('+pid+')">➕ Registrar lote</button></div>':'';
-  showModal('<h2>📦 Lotes — '+escapeHtmlLot(p.name)+'</h2><p style="font-size:12px;color:var(--text2);margin-bottom:10px;">Cantidades en <strong>cajas</strong>. m² y piezas son estimados (cajas × datos del producto). La venta descuenta en <strong>FIFO</strong> entre lotes de la misma bodega.</p><div class="table-wrap"><table><thead><tr><th>Bodega</th><th>Lote</th><th>Cajas</th><th>m² (est.)</th><th>Piezas (est.)</th><th>Ingreso</th><th></th></tr></thead><tbody>'+rowHtml+'</tbody></table></div><p style="font-size:12px;margin-top:10px;"><strong>Totales:</strong> Local '+stockAtLoc(p,'LOCAL')+' · B1 '+stockAtLoc(p,'BOD1')+' · B2 '+stockAtLoc(p,'BOD2')+' · Σ '+p.stock+'</p>'+addForm+'<div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cerrar</button></div>');
+  var addForm=canEdit?'<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px;"><div style="font-weight:600;margin-bottom:8px;">Agregar lote (existencia en cajas, admite decimales)</div><div class="grid-3" style="gap:8px;align-items:flex-end;"><div class="form-group"><label>Bodega</label><select id="newLotLoc">'+LOC_CODES.map(function(c){ return '<option value="'+c+'">'+LOC_LABELS[c]+'</option>'; }).join('')+'</select></div><div class="form-group"><label>Código de lote</label><input id="newLotCode" placeholder="ej. 06 74"></div><div class="form-group"><label>Cajas</label><input id="newLotQty" type="number" min="0" step="0.001" value="0"></div></div><button type="button" class="btn btn-success" style="margin-top:8px;" onclick="addProductLotEntry('+pid+')">➕ Registrar lote</button></div>':'';
+  showModal('<h2>📦 Lotes — '+escapeHtmlLot(p.name)+'</h2><p style="font-size:12px;color:var(--text2);margin-bottom:10px;">Cantidades en <strong>cajas equivalentes</strong> (puede haber fracciones tras ventas por m²/piezas). m² y piezas son estimados. Salida de inventario en <strong>FIFO por fecha de ingreso</strong> en cada bodega.</p><div class="table-wrap"><table><thead><tr><th>Bodega</th><th>Lote</th><th>Cajas</th><th>m² (est.)</th><th>Piezas (est.)</th><th>Ingreso</th><th></th></tr></thead><tbody>'+rowHtml+'</tbody></table></div><p style="font-size:12px;margin-top:10px;"><strong>Totales:</strong> Local '+fmtStockCajas(stockAtLoc(p,'LOCAL'))+' · B1 '+fmtStockCajas(stockAtLoc(p,'BOD1'))+' · B2 '+fmtStockCajas(stockAtLoc(p,'BOD2'))+' · Σ '+fmtStockCajas(p.stock)+'</p>'+addForm+'<div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cerrar</button></div>');
 }
 function commitProductLotQty(lotId,pid){
   var inp=document.getElementById('lotq_'+lotId);
-  var nv=parseInt(inp&&inp.value,10)||0;
+  var nv=Math.max(0,parseFloat(inp&&inp.value)||0);
   var lots=getLots();
   var lot=lots.find(function(l){ return l.id===lotId; });
   if(!lot) return;
   lot.qty=Math.max(0,nv);
-  if(lot.qty===0) lots=lots.filter(function(l){ return l.id!==lotId; });
+  if(lot.qty<=STOCK_EPS) lots=lots.filter(function(l){ return l.id!==lotId; });
   saveLots(lots);
   syncStockFromLotsByProductId(pid);
   closeModal();renderInventario();renderProducts();try{renderDashboard();}catch(e){}
@@ -2320,9 +2338,9 @@ function removeProductLot(lotId,pid){
 function addProductLotEntry(pid){
   var loc=(document.getElementById('newLotLoc')&&document.getElementById('newLotLoc').value)||'BOD1';
   var code=(document.getElementById('newLotCode')&&document.getElementById('newLotCode').value.trim())||'';
-  var q=parseInt(document.getElementById('newLotQty')&&document.getElementById('newLotQty').value,10)||0;
+  var q=parseFloat(document.getElementById('newLotQty')&&document.getElementById('newLotQty').value)||0;
   if(!code) return alert2('Indique el código del lote','error');
-  if(q<=0) return alert2('Las cajas deben ser mayor a 0','error');
+  if(q<=STOCK_EPS) return alert2('Las cajas deben ser mayor a 0','error');
   var lots=getLots();
   if(lots.some(function(l){ return l.productId===pid&&l.locationCode===loc&&String(l.lotCode||'')===code; }))
     return alert2('Ya existe ese lote en esa bodega. Ajuste la cantidad en la tabla.','error');
@@ -2339,16 +2357,16 @@ function addProductLotEntry(pid){
 let cart=[];
 function saleLineCajas(c){
   var p=getProdById(c.id);
-  if(!p) return Math.max(1,parseInt(c.qty,10)||1);
+  if(!p) return Math.max(0,Number(c.qty)||0);
   if(c.qtyMode==='m2'&&Number(p.m2PerBox)>0){
     var m2=Number(c.m2)||0;
-    return Math.max(1,Math.ceil(m2/Number(p.m2PerBox)-1e-9));
+    return m2>0?m2/Number(p.m2PerBox):0;
   }
   if(c.qtyMode==='piezas'&&Number(p.piecesPerBox)>0){
     var pz=Number(c.piezas)||0;
-    return Math.max(1,Math.ceil(pz/Number(p.piecesPerBox)-1e-9));
+    return pz>0?pz/Number(p.piecesPerBox):0;
   }
-  return Math.max(1,parseInt(c.qty,10)||1);
+  return Math.max(0,Number(c.qty)||0);
 }
 function saleLineSubtotal(c){
   var p=getProdById(c.id);
@@ -2383,10 +2401,10 @@ function searchSaleProducts(){
         <div><span class="precio-venta">${fmt(p.price)}</span></div>
         ${p.priceCost>0?`<div style="font-size:10px;color:var(--text2);">Costo: ${fmt(p.priceCost)}</div>`:''}
         ${p.priceLimit>0?`<div><span class="precio-limite" style="font-size:10px;">mín ${fmt(p.priceLimit)}</span></div>`:''}
-        <div style="font-size:10px;color:var(--text2);">Fís. L ${sl} · B1 ${s1} · B2 ${s2}</div>
-        <div style="font-size:10px;color:var(--teal-dk);">Disp. L ${dl} · B1 ${d1} · B2 ${d2}</div>
+        <div style="font-size:10px;color:var(--text2);">Fís. L ${fmtStockCajas(sl)} · B1 ${fmtStockCajas(s1)} · B2 ${fmtStockCajas(s2)}</div>
+        <div style="font-size:10px;color:var(--teal-dk);">Disp. L ${fmtStockCajas(dl)} · B1 ${fmtStockCajas(d1)} · B2 ${fmtStockCajas(d2)}</div>
         <div style="font-size:11px;color:${disp===0?'var(--red)':disp<=5?'var(--amber)':'var(--text2)'}">
-          Σ disp. ${disp}${disp===0?' ❌':disp<=5?' ⚠️':''}
+          Σ disp. ${fmtStockCajas(disp)}${disp===0?' ❌':disp<=5?' ⚠️':''}
         </div>
       </div>
     </div>`;}).join('');
@@ -2458,8 +2476,8 @@ function addToCart(id){
     delete newLine.qty;
   }
   var need=saleLineCajas(newLine);
-  if(need>limajeDisponibleEnBodega(p,loc)){
-    var alt=['LOCAL','BOD1','BOD2'].find(function(c){ return limajeDisponibleEnBodega(p,c)>=need; });
+  if(!stockCovers(limajeDisponibleEnBodega(p,loc),need)){
+    var alt=['LOCAL','BOD1','BOD2'].find(function(c){ return stockCovers(limajeDisponibleEnBodega(p,c),need); });
     if(alt) newLine.locationCode=alt;
     else return alert2('Sin stock disponible (descontando reservado) para '+p.name,'error');
   }
@@ -2467,7 +2485,7 @@ function addToCart(id){
   if(existing){
     var addCaj=need;
     if(existing.qtyMode==='cajas'){
-      if(saleLineCajas(existing)+addCaj>limajeDisponibleEnBodega(p,existing.locationCode)) return alert2('No hay más stock en '+LOC_LABELS[existing.locationCode],'error');
+      if(!stockCovers(limajeDisponibleEnBodega(p,existing.locationCode),saleLineCajas(existing)+addCaj)) return alert2('No hay más stock en '+LOC_LABELS[existing.locationCode],'error');
       existing.qty+=1;
     }else if(existing.qtyMode==='m2'){
       existing.m2=(Number(existing.m2)||0)+(Number(p.m2PerBox)||1);
@@ -2483,7 +2501,7 @@ function saleUpdateLine(lineId,field,val){
   if(field==='m2') item.m2=Math.max(0.01,parseFloat(val)||0.01);
   if(field==='piezas') item.piezas=Math.max(1,parseInt(val,10)||1);
   var need=saleLineCajas(item);
-  if(need>limajeDisponibleEnBodega(p,item.locationCode)) return alert2('Cantidad supera disponible en '+LOC_LABELS[item.locationCode],'error');
+  if(!stockCovers(limajeDisponibleEnBodega(p,item.locationCode),need)) return alert2('Cantidad supera disponible en '+LOC_LABELS[item.locationCode],'error');
   renderSaleCart();calcDescuento();
 }
 function saleSetLineMode(lineId,mode){
@@ -2502,10 +2520,10 @@ function saleSetLineMode(lineId,mode){
   }else{
     item.qtyMode='cajas';
     if(item.piezas!=null&&Number(p.piecesPerBox)>0)
-      item.qty=Math.max(1,Math.ceil((Number(item.piezas)||0)/Number(p.piecesPerBox)-1e-9));
+      item.qty=Math.max(0,(Number(item.piezas)||0)/Number(p.piecesPerBox));
     else{
       var m2v=Number(item.m2)||Number(p.m2PerBox);
-      item.qty=Math.max(1,Math.ceil(m2v/Number(p.m2PerBox)-1e-9));
+      item.qty=m2v>0&&Number(p.m2PerBox)>0?m2v/Number(p.m2PerBox):1;
     }
     delete item.m2;delete item.piezas;
   }
@@ -2514,17 +2532,17 @@ function saleSetLineMode(lineId,mode){
 function updateCartQty(lineId,val){
   const item=cart.find(c=>c.lineId===lineId);if(!item)return;
   const p=getProdById(item.id);
-  const qty=Math.max(1,parseInt(val,10)||1);
+  const qty=Math.max(0.0001,parseFloat(val)||1);
   item.qty=qty;
   var need=saleLineCajas(item);
-  if(need>limajeDisponibleEnBodega(p,item.locationCode))return alert2('No hay suficiente stock en '+LOC_LABELS[item.locationCode],'error');
+  if(!stockCovers(limajeDisponibleEnBodega(p,item.locationCode),need))return alert2('No hay suficiente stock en '+LOC_LABELS[item.locationCode],'error');
   renderSaleCart();calcDescuento();
 }
 function changeCartLineLocation(lineId,newLoc){
   const item=cart.find(c=>c.lineId===lineId);if(!item)return;
   const p=getProdById(item.id);
   var need=saleLineCajas(item);
-  if(limajeDisponibleEnBodega(p,newLoc)<need)return alert2('Stock insuficiente en '+LOC_LABELS[newLoc],'error');
+  if(!stockCovers(limajeDisponibleEnBodega(p,newLoc),need))return alert2('Stock insuficiente en '+LOC_LABELS[newLoc],'error');
   item.locationCode=newLoc;
   renderSaleCart();calcDescuento();
 }
@@ -2545,7 +2563,7 @@ function renderSaleCart(){
     var p=getProdById(c.id);
     return LOC_CODES.map(function(code){
       var disp=p?limajeDisponibleEnBodega(p,code):0;
-      return '<option value="'+code+'" '+(c.locationCode===code?'selected':'')+'>'+LOC_LABELS[code]+' (disp. '+disp+')</option>';
+      return '<option value="'+code+'" '+(c.locationCode===code?'selected':'')+'>'+LOC_LABELS[code]+' (disp. '+fmtStockCajas(disp)+')</option>';
     }).join('');
   };
   document.getElementById('saleCart').innerHTML=`<table>
@@ -2565,7 +2583,7 @@ function renderSaleCart(){
         qtyCell='<input type="number" min="1" step="1" value="'+(parseInt(c.piezas,10)||1)+'" style="width:56px;padding:4px;" onchange="saleUpdateLine('+c.lineId+',\'piezas\',this.value)"> pzs';
         if(p&&Number(p.piecesPerBox)>0) pu=(Number(p.price)||0)/Number(p.piecesPerBox);
       }else{
-        qtyCell='<input type="number" value="'+(c.qty||1)+'" min="1" style="width:50px;padding:4px 6px;" onchange="updateCartQty('+c.lineId+',this.value)"> cj.';
+        qtyCell='<input type="number" value="'+(Number(c.qty)||0)+'" min="0.0001" step="0.001" style="width:64px;padding:4px 6px;" onchange="updateCartQty('+c.lineId+',this.value)"> cj.';
       }
       return '<tr><td><span style="font-size:11px;color:var(--text2)">'+c.code+'</span><br><strong>'+c.name+'</strong></td><td><select class="sale-loc-sel" style="font-size:11px;max-width:130px;padding:4px;" onchange="changeCartLineLocation('+c.lineId+',this.value)">'+locSel(c)+'</select></td><td>'+unitCell+'</td><td>'+qtyCell+'</td><td><span class="precio-venta">'+fmt(pu)+(mode==='m2'?'/m²':mode==='piezas'?'/pz':'')+'</span></td><td><strong>'+fmt(saleLineSubtotal(c))+'</strong></td><td><button class="btn btn-sm btn-danger" onclick="removeFromCart('+c.lineId+')">✕</button></td></tr>';
     }).join('')}</tbody></table>`;
@@ -2588,7 +2606,7 @@ function calcDescuento(){
     if(c.priceLimit>0){
       var lt=saleLineSubtotal(c);
       var bx=saleLineCajas(c);
-      const maxItemDesc=lt-c.priceLimit*bx;
+      const maxItemDesc=lt-c.priceLimit*Math.max(bx,1e-9);
       return s+Math.max(0,maxItemDesc);
     }
     return s;
@@ -2607,7 +2625,7 @@ function calcDescuento(){
       const prop=lineTot/subtotal;
       const itemDisc=desc*prop;
       var qEff=saleLineCajas(c);
-      const finalPerUnit=(lineTot-itemDisc)/Math.max(1,qEff);
+      const finalPerUnit=(lineTot-itemDisc)/Math.max(1e-9,qEff);
       if(finalPerUnit<c.priceLimit){violation=true;violName=c.name;}
     }
   });
@@ -2640,7 +2658,7 @@ function finalizarVenta(){
         var lt=saleLineSubtotal(c);
         const prop=lt/subtotal;
         const itemDisc=desc*prop;
-        const finalPerUnit=(lt-itemDisc)/Math.max(1,saleLineCajas(c));
+        const finalPerUnit=(lt-itemDisc)/Math.max(1e-9,saleLineCajas(c));
         if(finalPerUnit<c.priceLimit)violation=true;
       }
     });
@@ -2657,7 +2675,8 @@ function finalizarVenta(){
     var lc=ci0.locationCode||'LOCAL';
     ensureStockByLoc(prods[ix]);
     var need0=saleLineCajas(ci0);
-    if(limajeDisponibleEnBodega(prods[ix],lc)<need0){ alert2('Stock insuficiente en '+LOC_LABELS[lc]+' para '+ci0.name,'error'); return; }
+    if(need0<=STOCK_EPS){ alert2('Cantidad inválida en línea: '+ci0.name,'error'); return; }
+    if(!stockCovers(limajeDisponibleEnBodega(prods[ix],lc),need0)){ alert2('Stock insuficiente en '+LOC_LABELS[lc]+' para '+ci0.name,'error'); return; }
   }
   cart.forEach(ci=>{
     const idx=prods.findIndex(p=>p.id===ci.id);
@@ -2705,6 +2724,39 @@ function finalizarVenta(){
   showReceipt(mov);
 }
 
+function ventaItemSubtotalStored(i){
+  if(i.subtotalLinea!=null&&isFinite(Number(i.subtotalLinea))) return Number(i.subtotalLinea);
+  return saleLineSubtotal({ id:i.id, qtyMode:i.qtyMode, m2:i.m2, piezas:i.piezas, qty:i.qty, price:i.price });
+}
+function ventaItemCantidadEtiqueta(i){
+  var m=i.qtyMode||'cajas';
+  if(m==='m2'){
+    var mv=Number(i.m2);
+    if(isFinite(mv)&&mv>STOCK_EPS) return mv.toFixed(2)+' m²';
+    return fmtStockCajas(i.qty)+' cj (equiv.)';
+  }
+  if(m==='piezas'){
+    var pz=Number(i.piezas);
+    if(isFinite(pz)&&pz>STOCK_EPS) return String(Math.round(pz))+' pzs';
+    return fmtStockCajas(i.qty)+' cj (equiv.)';
+  }
+  return fmtStockCajas(i.qty)+' cj';
+}
+function ventaItemPrecioUnitarioMostrar(i){
+  var sub=ventaItemSubtotalStored(i);
+  var m=i.qtyMode||'cajas';
+  if(m==='m2'){
+    var mv=Number(i.m2);
+    if(isFinite(mv)&&mv>STOCK_EPS) return sub/mv;
+    return sub/Math.max(Number(i.qty)||0,1e-9);
+  }
+  if(m==='piezas'){
+    var pz=Number(i.piezas);
+    if(isFinite(pz)&&pz>STOCK_EPS) return sub/pz;
+    return sub/Math.max(Number(i.qty)||0,1e-9);
+  }
+  return sub/Math.max(Number(i.qty)||0,1e-9);
+}
 function showReceipt(mov){
   const rid=mov.id;
   showModal(`<h2>✅ Venta Registrada</h2>
@@ -2724,12 +2776,17 @@ function showReceipt(mov){
 function buildReceiptHTML(mov,mode){
   const date=new Date(mov.ts);
   const ds=date.toLocaleDateString('es-GT')+' '+date.toLocaleTimeString('es-GT');
-  const items=(mov.items||[]).map(i=>`
+  const items=(mov.items||[]).map(function(i){
+    var cant=ventaItemCantidadEtiqueta(i);
+    var pu=ventaItemPrecioUnitarioMostrar(i);
+    var sub=ventaItemSubtotalStored(i);
+    return `
     <div class="receipt-row">
       <span style="flex:1;padding-right:4px;">${i.name}${i.code?' ('+i.code+')':''}${i.locationCode&&LOC_LABELS[i.locationCode]?' · '+LOC_LABELS[i.locationCode]:''}</span>
-      <span style="white-space:nowrap;">${i.qty} x ${fmt(i.price)} = ${fmt(i.price*i.qty)}</span>
-    </div>`).join('');
-  const subtotal=(mov.items||[]).reduce((s,i)=>s+i.price*i.qty,0);
+      <span style="white-space:nowrap;">${cant} × ${fmt(pu)} = ${fmt(sub)}</span>
+    </div>`;
+  }).join('');
+  const subtotal=(mov.items||[]).reduce(function(s,i){ return s+ventaItemSubtotalStored(i); },0);
   const isA4=(mode==='a4');
   /* Logo LIMAJE: diamantes verde(L,I), rojo(M,A), azul(J,E) para impresión */
   const logoW=isA4?140:90; const logoH=isA4?32:22;
@@ -3152,7 +3209,7 @@ function renderMovimientos(){
       <td style="font-size:11px;color:var(--text2)">${m.id}</td>
       <td style="font-size:11px">${fmtDt(m.ts)}</td>
       <td><span class="badge ${m.type==='venta'?'badge-green':m.type==='ingreso'?'badge-blue':m.type==='abono'?'badge-teal':'badge-red'}">${m.type==='ingreso'?'otro ingreso':m.type}</span></td>
-      <td style="font-size:11px;max-width:180px;">${m.type==='venta'?(m.items||[]).map(i=>i.name+' x'+i.qty+(i.locationCode?' ['+LOC_LABELS[i.locationCode]+']':'')).join(', '):m.note||m.desc||'—'}</td>
+      <td style="font-size:11px;max-width:180px;">${m.type==='venta'?(m.items||[]).map(i=>i.name+' x'+ventaItemCantidadEtiqueta(i)+(i.locationCode?' ['+LOC_LABELS[i.locationCode]+']':'')).join(', '):m.note||m.desc||'—'}</td>
       <td style="font-size:10px;max-width:100px;">${m.type==='venta'?(m.nit||'—')+'<br><strong>'+(m.numeroFactura||'—')+'</strong>':'—'}</td>
       <td style="font-size:11px">${m.pago||m.categ||'—'}</td>
       <td class="${m.type==='egreso'?'monto-egreso':'monto-ingreso'}">${fmt(m.total)}</td>
@@ -3769,13 +3826,13 @@ function cotizCajasParaVenta(l){
   var p=l.productId?getProdById(l.productId):null;
   if(l.qtyMode==='m2' && p && cotizProductSupportsM2(p)){
     var m2=Number(l.m2)||0;
-    return Math.max(1,Math.ceil(m2/Number(p.m2PerBox)-1e-9));
+    return m2>0?m2/Number(p.m2PerBox):0;
   }
   if(l.qtyMode==='piezas' && p && Number(p.piecesPerBox)>0){
     var pz=Number(l.piezas)||0;
-    return Math.max(1,Math.ceil(pz/Number(p.piecesPerBox)-1e-9));
+    return pz>0?pz/Number(p.piecesPerBox):0;
   }
-  return Math.max(1,parseInt(l.qty,10)||1);
+  return Math.max(0,Number(l.qty)||0);
 }
 
 function cotizPushHistorial(q, label, detalle){
@@ -4148,7 +4205,8 @@ function aplicarVentaDesdeCotizacion(ventaJson){
     vendedor:ventaJson.vendedor||'',
     items:(ventaJson.items||[]).map(function(it){
       return { lineId:it.lineId||Date.now()+Math.random(), id:it.id, code:it.code, name:it.name, price:Number(it.price)||0,
-        priceCost:Number(it.priceCost)||0, priceLimit:Number(it.priceLimit)||0, qty:Number(it.qty)||1, locationCode:it.locationCode||'LOCAL' };
+        priceCost:Number(it.priceCost)||0, priceLimit:Number(it.priceLimit)||0, qty:Number(it.qty)||0, locationCode:it.locationCode||'LOCAL',
+        qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas, subtotalLinea:it.subtotalLinea };
     })
   });
   DB.set('movements',mvs);
@@ -4159,7 +4217,8 @@ function aplicarVentaDesdeCotizacion(ventaJson){
     var idx=prods.findIndex(function(p){ return p.id===pid; });
     if(idx<0) return;
     var loc=it.locationCode||'LOCAL';
-    var q=Number(it.qty)||0;
+    var q=saleLineCajas({ id:pid, qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas, qty:it.qty });
+    if(!(q>STOCK_EPS)) q=Number(it.qty)||0;
     ensureStockByLoc(prods[idx]);
     prods[idx].stockByLocation[loc]=Math.max(0,(Number(prods[idx].stockByLocation[loc])||0)-q);
     recomputeStockTotal(prods[idx]);
@@ -4501,7 +4560,8 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   doc.setTextColor(35,35,35);
   y+=11;
   (mov.items||[]).forEach(function(it,idx){
-    var line=(Number(it.price)||0)*(Number(it.qty)||0);
+    var line=ventaItemSubtotalStored(it);
+    var cantStr=ventaItemCantidadEtiqueta(it);
     var txt=(it.name||'')+(it.code?' ('+it.code+')':'')+(it.locationCode&&LOC_LABELS[it.locationCode]?' · '+LOC_LABELS[it.locationCode]:'');
     var nl=doc.splitTextToSize(txt,95);
     var hh=nl.length*4+2;
@@ -4511,13 +4571,13 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
     doc.setLineWidth(0.15);
     doc.line(M,y-1+hh,M+W,y-1+hh);
     doc.text(nl,M+3,y+3);
-    doc.text(String(it.qty),M+122,y+3);
+    doc.text(cantStr,M+122,y+3);
     doc.text(line.toFixed(2),M+W-2,y+3,{align:'right'});
     y+=hh;
   });
   y+=6;
   doc.line(M,y,M+W,y); y+=7;
-  var sub=(mov.items||[]).reduce(function(s,i){ return s+(Number(i.price)||0)*(Number(i.qty)||0); },0);
+  var sub=(mov.items||[]).reduce(function(s,i){ return s+ventaItemSubtotalStored(i); },0);
   doc.text('Subtotal',M+120,y);
   doc.text('Q '+sub.toFixed(2),M+W-2,y,{align:'right'});
   y+=6;
@@ -4638,13 +4698,29 @@ function cotizCargarEnVenta(){
     if(!l.productId){ miss.push(l.name); return; }
     var p=getProdById(l.productId); if(!p){ miss.push(l.name); return; }
     var need=cotizCajasParaVenta(l);
-    var loc=l.locationCode||pickDefaultLocation(p);
-    if(!loc || stockAtLoc(p,loc)<need){
-      var alt=['LOCAL','BOD1','BOD2'].find(function(c){ return stockAtLoc(p,c)>=need; });
+    if(need<=STOCK_EPS){ miss.push(l.name+' (cantidad)'); return; }
+    var line={ lineId:Date.now()+Math.random(), id:l.productId, code:l.code, name:l.name, price:l.price, priceCost:p.priceCost||0, priceLimit:p.priceLimit||0, locationCode:l.locationCode||pickDefaultLocation(p) };
+    var qm=l.qtyMode||'cajas';
+    if(qm==='m2'&&cotizProductSupportsM2(p)){
+      line.qtyMode='m2';
+      line.m2=Number(l.m2)||0;
+    }else if(qm==='piezas'&&Number(p.piecesPerBox)>0){
+      line.qtyMode='piezas';
+      line.piezas=Number(l.piezas)||0;
+    }else{
+      line.qtyMode='cajas';
+      line.qty=Math.max(0,Number(l.qty)||0);
+    }
+    if(saleLineCajas(line)<=STOCK_EPS){ miss.push(l.name+' (cantidad)'); return; }
+    need=saleLineCajas(line);
+    var loc=line.locationCode;
+    if(!loc || !stockCovers(limajeDisponibleEnBodega(p,loc),need)){
+      var alt=['LOCAL','BOD1','BOD2'].find(function(c){ return stockCovers(limajeDisponibleEnBodega(p,c),need); });
       loc=alt||loc;
     }
-    if(!loc || stockAtLoc(p,loc)<need){ miss.push(l.name+' (stock)'); return; }
-    cart.push({ lineId:Date.now()+Math.random(), id:l.productId, code:l.code, name:l.name, price:l.price, priceCost:p.priceCost||0, priceLimit:p.priceLimit||0, qty:need, locationCode:loc });
+    line.locationCode=loc;
+    if(!loc || !stockCovers(limajeDisponibleEnBodega(p,loc),need)){ miss.push(l.name+' (stock)'); return; }
+    cart.push(line);
   });
   navigateTo('ventas');
   renderSaleCart();
