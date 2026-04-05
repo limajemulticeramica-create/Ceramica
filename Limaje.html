@@ -404,7 +404,13 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
       </div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-title">📁 Árbol de Categorías</div>
+          <div class="card-title" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">
+            <span>📁 Árbol de Categorías</span>
+            <span style="display:flex;flex-wrap:wrap;gap:6px;">
+              <button type="button" class="btn btn-sm btn-secondary" onclick="categoryTreeExpandAll()" title="Mostrar productos bajo cada categoría">Expandir todo</button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="categoryTreeCollapseAll()" title="Ocultar listados bajo categorías">Contraer todo</button>
+            </span>
+          </div>
           <div id="categoryTree"></div>
         </div>
         <div class="card">
@@ -1596,10 +1602,14 @@ function getWorkerPayments(){return DB.get('workerPayments',[]);}
 function getCotizaciones(){return DB.get('cotizaciones',[]);}
 var __limajeStockResMap={};
 var __limajePeriodoCerradoMap={};
+/** Árbol categorías: id categoría padre → true si está contraída */
+var __limajeCatTreeCollapsed={};
 var cotHistOffset=0;
 var COT_HIST_PAGE=50;
 function limajeMapSqlRowToCotiz(row){
   var pid=row.periodo_id;
+  var convTs=null;
+  if(row.updated_at&&row.status==='convertida') try{ convTs=new Date(row.updated_at).getTime(); }catch(e){}
   return {
     id:row.numero_serial,
     sqlId:row.id,
@@ -1619,6 +1629,7 @@ function limajeMapSqlRowToCotiz(row){
     fecha:row.fecha||'',
     date:row.fecha||'',
     ts:row.ts_millis||Date.now(),
+    convertidoEnTs:convTs,
     creadoPor:row.creado_por||'',
     actualizadoPor:row.actualizado_por||'',
     elaboradoPor:row.elaborado_por,
@@ -1923,19 +1934,36 @@ function setupCatButtons(){
   const btns=document.getElementById('catAdminBtns');if(!btns)return;
   btns.innerHTML=canEditCategories()?`<button class="btn" onclick="openAddCategory()">+ Categoría</button><button class="btn btn-success" onclick="openAddProduct()">+ Producto</button>`:'';
 }
+function toggleCategoryTree(pid){
+  __limajeCatTreeCollapsed[pid]=!__limajeCatTreeCollapsed[pid];
+  renderCategoryTree();
+}
+function categoryTreeExpandAll(){
+  __limajeCatTreeCollapsed={};
+  renderCategoryTree();
+}
+function categoryTreeCollapseAll(){
+  __limajeCatTreeCollapsed={};
+  getCategories().filter(function(c){ return !c.parentId; }).forEach(function(p){ __limajeCatTreeCollapsed[p.id]=true; });
+  renderCategoryTree();
+}
 function renderCategoryTree(){
   const cats=getCategories();const parents=cats.filter(c=>!c.parentId);const prods=getProducts();
   document.getElementById('categoryTree').innerHTML=parents.map(p=>{
     const children=cats.filter(c=>c.parentId===p.id);
     const dProds=prods.filter(pr=>pr.categoryId===p.id);
+    const nUnder=children.length+dProds.length;
+    const collapsed=!!__limajeCatTreeCollapsed[p.id];
     return `<div class="tree-cat">
-      <div class="tree-parent">
+      <div class="tree-parent" style="align-items:center;gap:6px;">
+        <button type="button" class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:12px;min-width:32px;" onclick="toggleCategoryTree(${p.id})" title="Mostrar u ocultar subcategorías y productos">${collapsed?'▶':'▼'}</button>
         <span>📁</span><span class="tree-parent-name">${escapeHtml(p.name)}</span><span class="tree-code">${escapeHtml(p.code)}</span>
+        <span class="badge badge-teal" style="font-size:10px;border-radius:10px;padding:2px 7px;" title="Ítems bajo esta categoría">${nUnder}</span>
         ${canEditCategories()?`<button class="btn btn-sm btn-secondary" style="padding:2px 6px;font-size:11px;" onclick="openEditCategory(${p.id})">✏️</button>
           <button class="btn btn-sm" style="padding:2px 6px;font-size:11px;background:var(--teal-lt);" onclick="openAddSubCategory(${p.id})">+Sub</button>
           <button class="btn btn-sm btn-danger" style="padding:2px 5px;font-size:11px;" onclick="deleteCategory(${p.id})">✕</button>`:''}
       </div>
-      <div class="tree-children">
+      <div class="tree-children" style="display:${collapsed?'none':'block'}">
         ${children.map(ch=>`<div class="tree-child">
           <span>📄</span><span class="tree-child-name">${escapeHtml(ch.name)} <span class="badge badge-teal" style="font-size:10px;">${escapeHtml(ch.code)}</span></span>
           ${canEditCategories()?`<button class="btn btn-sm btn-secondary" style="padding:1px 5px;font-size:11px;" onclick="openEditCategory(${ch.id})">✏️</button>
@@ -2457,6 +2485,31 @@ function pickDefaultLocation(p){
     if(q>bq){bq=q;best=c;}
   });
   return best;
+}
+/** Primera bodega donde hay al menos need cajas (equiv.) disponibles; null si ninguna */
+function pickWarehouseCoveringNeed(p,need){
+  var n=Number(need)||0;
+  if(n<=STOCK_EPS) return pickDefaultLocation(p);
+  var hit=LOC_CODES.find(function(c){ return stockCovers(limajeDisponibleEnBodega(p,c),n); });
+  return hit||null;
+}
+function cotizHintDisponiblePorBodega(p){
+  return 'Disponible (incl. reservas otras cotiz.): Local '+fmtStockCajas(limajeDisponibleEnBodega(p,'LOCAL'))+
+    ' · B1 '+fmtStockCajas(limajeDisponibleEnBodega(p,'BOD1'))+
+    ' · B2 '+fmtStockCajas(limajeDisponibleEnBodega(p,'BOD2'));
+}
+/** Asigna locationCode en líneas con inventario según stock real por bodega (para reserva SQL) */
+function cotizAssignWarehousesFromStock(lineas){
+  var LM=window.__limajeSqlCore;
+  (lineas||[]).forEach(function(l){
+    if(l.sinInventario||!l.productId) return;
+    var p=getProdById(l.productId);
+    if(!p) return;
+    var need=LM?LM.lineCajasInventario(l,getProdById):cotizCajasParaVenta(l);
+    if(need<=STOCK_EPS) return;
+    var w=pickWarehouseCoveringNeed(p,need);
+    if(w) l.locationCode=w;
+  });
 }
 function addToCart(id){
   if(!canSell()) return alert2('Sin permiso de venta','error');
@@ -3344,7 +3397,10 @@ function generateReport(){
   const prodMap={};
   ventas.forEach(v=>(v.items||[]).forEach(i=>{
     if(!prodMap[i.name])prodMap[i.name]={qty:0,total:0};
-    prodMap[i.name].qty+=i.qty;prodMap[i.name].total+=i.price*i.qty;
+    var eq=saleLineCajas({ id:i.id, qtyMode:i.qtyMode, m2:i.m2, piezas:i.piezas, qty:i.qty });
+    if(!(eq>STOCK_EPS)) eq=Number(i.qty)||0;
+    prodMap[i.name].qty+=eq;
+    prodMap[i.name].total+=ventaItemSubtotalStored(i);
   }));
 
   // Agrupación por categoría
@@ -3353,7 +3409,10 @@ function generateReport(){
     const prod=prods.find(p=>p.id===i.id);
     const catNm=prod?getCatName(prod.categoryId):'Otros';
     if(!catMap[catNm])catMap[catNm]={qty:0,total:0};
-    catMap[catNm].qty+=i.qty;catMap[catNm].total+=i.price*i.qty;
+    var eq2=saleLineCajas({ id:i.id, qtyMode:i.qtyMode, m2:i.m2, piezas:i.piezas, qty:i.qty });
+    if(!(eq2>STOCK_EPS)) eq2=Number(i.qty)||0;
+    catMap[catNm].qty+=eq2;
+    catMap[catNm].total+=ventaItemSubtotalStored(i);
   }));
 
   // Agrupación por pago
@@ -3391,13 +3450,13 @@ function generateReport(){
     <div class="grid-3" style="margin-bottom:14px;">
       <div>
         <div class="card-title">🏆 Por Producto</div>
-        <table><thead><tr><th>Producto</th><th>Uds.</th><th>Total</th></tr></thead>
-        <tbody>${Object.entries(prodMap).sort((a,b)=>b[1].total-a[1].total).map(([n,d])=>`<tr><td>${n}</td><td>${d.qty}</td><td class="monto-ingreso">${fmt(d.total)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--text2);">Sin datos</td></tr>'}</tbody></table>
+        <table><thead><tr><th>Producto</th><th>Cajas (equiv.)</th><th>Total</th></tr></thead>
+        <tbody>${Object.entries(prodMap).sort((a,b)=>b[1].total-a[1].total).map(([n,d])=>`<tr><td>${escapeHtml(n)}</td><td>${fmtStockCajas(d.qty)}</td><td class="monto-ingreso">${fmt(d.total)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--text2);">Sin datos</td></tr>'}</tbody></table>
       </div>
       <div>
         <div class="card-title">🗂 Por Categoría</div>
-        <table><thead><tr><th>Categoría</th><th>Uds.</th><th>Total</th></tr></thead>
-        <tbody>${Object.entries(catMap).sort((a,b)=>b[1].total-a[1].total).map(([n,d])=>`<tr><td>${n}</td><td>${d.qty}</td><td class="monto-ingreso">${fmt(d.total)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--text2);">Sin datos</td></tr>'}</tbody></table>
+        <table><thead><tr><th>Categoría</th><th>Cajas (equiv.)</th><th>Total</th></tr></thead>
+        <tbody>${Object.entries(catMap).sort((a,b)=>b[1].total-a[1].total).map(([n,d])=>`<tr><td>${escapeHtml(n)}</td><td>${fmtStockCajas(d.qty)}</td><td class="monto-ingreso">${fmt(d.total)}</td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--text2);">Sin datos</td></tr>'}</tbody></table>
       </div>
       <div>
         <div class="card-title">💳 Por Forma de Pago</div>
@@ -3410,13 +3469,13 @@ function generateReport(){
     <div class="table-wrap"><table>
       <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Productos</th><th>Pago</th><th>Desc.</th><th>Total</th></tr></thead>
       <tbody>${ventas.length?ventas.map(v=>{
-        const itemTot=(v.items||[]).reduce((s,i)=>s+i.price*i.qty,0);
+        const itemTot=(v.items||[]).reduce((s,i)=>s+ventaItemSubtotalStored(i),0);
         return`<tr>
           <td style="font-size:10px;color:var(--text2)">${v.id}</td>
           <td style="font-size:11px">${fmtDt(v.ts)}</td>
           <td style="font-size:12px">${v.note||'—'}</td>
           <td style="font-size:11px">${v.vendedor}</td>
-          <td style="font-size:11px;max-width:170px;">${(v.items||[]).map(i=>i.name+' x'+i.qty).join(', ')}</td>
+          <td style="font-size:11px;max-width:170px;">${(v.items||[]).map(i=>escapeHtml(i.name)+' × '+ventaItemCantidadEtiqueta(i)).join(', ')}</td>
           <td><span class="badge ${v.pago==='credito'?'badge-purple':'badge-teal'}" style="font-size:10px;">${v.pago}</span></td>
           <td style="color:var(--red);font-size:11px;">${(v.descuento||0)>0?fmt(v.descuento):'—'}</td>
           <td class="monto-ingreso"><strong>${fmt(v.total)}</strong></td>
@@ -3999,7 +4058,7 @@ function cotizAddProduct(pid){
     qty:useM2?undefined:1,
     price:p.price,
     sinInventario:false,
-    locationCode:'LOCAL'
+    locationCode:pickDefaultLocation(p)||'LOCAL'
   });
   cotizRenderLineas();
 }
@@ -4157,6 +4216,27 @@ async function cotizGuardar(){
   if(sb&&LM){
     try{
       await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+      await limajeRefreshStockMap();
+      cotizAssignWarehousesFromStock(cotizLineas);
+      if(status==='pendiente'){
+        var sinBod=[];
+        cotizLineas.forEach(function(l){
+          if(l.sinInventario||!l.productId) return;
+          var pr=getProdById(l.productId);
+          if(!pr) return;
+          var nd=LM.lineCajasInventario(l,getProdById);
+          if(nd<=STOCK_EPS) return;
+          if(!pickWarehouseCoveringNeed(pr,nd)) sinBod.push(l.name||l.code||String(l.productId));
+        });
+        if(sinBod.length){
+          var pr0=cotizLineas.find(function(x){ return x.productId&&!x.sinInventario; });
+          var pHint=pr0?getProdById(pr0.productId):null;
+          alert2('Stock insuficiente (por bodega, ya descontando reservas de otras cotizaciones) en: '+sinBod.join(', ')+'. Use estado «Pendiente abastecimiento» o reduzca cantidades.'+(pHint?'\n'+cotizHintDisponiblePorBodega(pHint):''),'error');
+          return;
+        }
+      }
+      row.items=JSON.parse(JSON.stringify(cotizLineas));
+      list[ri]=row;
       var enriched=LM.enrichCotizItemsForSql(cotizLineas, getProdById, cotizLineSubtotal);
       var payload={
         id:row.sqlId||null,
@@ -4184,7 +4264,11 @@ async function cotizGuardar(){
       list[ri]=row;
     }catch(err){
       console.error(err);
-      alert2('Nube: '+(err.message||err),'error');
+      var em=String(err.message||err);
+      var extra='';
+      if(em.indexOf('insuficiente')>=0||em.indexOf('Stock disponible')>=0)
+        extra='\n\nLa nube reserva por bodega (Local, B1, B2). El Σ del catálogo suma las tres; si el material está en B2 y la línea apuntaba a Local, falla hasta reasignar bodega (se hace al guardar). Si otra cotización «Pendiente» ya reservó, el disponible baja.';
+      alert2('Nube: '+em+extra,'error');
       return;
     }
   }
@@ -4238,7 +4322,8 @@ async function cotizConfirmarDesdeLista(id){
     await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
     var meta={
       pago:'Efectivo', next_venta_id: nextMovementId(), date:today(), ts: nowTs(),
-      note:q.cliente, nit:q.nit||'', numeroFactura:'', vendedor:(currentUser&&currentUser.username)||''
+      note:'Cot. #'+q.id+' — '+(q.cliente||'').trim(),
+      nit:q.nit||'', numeroFactura:'', vendedor:(currentUser&&currentUser.username)||''
     };
     var r=await LM.confirmarCotizacionRpc(q.sqlId, meta);
     if(r&&r.ok===false){ alert2(r.error||'No confirmada','error'); return; }
@@ -4253,7 +4338,7 @@ async function cotizConfirmarDesdeLista(id){
     }
     aplicarVentaDesdeCotizacion(r.venta);
     var list3=getCotizaciones().map(function(c){
-      return c.id===id?Object.assign({},c,{ status:'convertida', ventaId:r.venta_id }):c;
+      return c.id===id?Object.assign({},c,{ status:'convertida', ventaId:r.venta_id, convertidoEnTs:Date.now() }):c;
     });
     DB.set('cotizaciones',list3);
     await limajeRefreshStockMap();
@@ -4723,6 +4808,18 @@ function cotizCargarEnVenta(){
     cart.push(line);
   });
   navigateTo('ventas');
+  var qList=cotizEditId?getCotizaciones().find(function(x){ return x.id===cotizEditId;}):null;
+  var cliDom=(document.getElementById('cotizCliente')&&document.getElementById('cotizCliente').value||'').trim();
+  var noteRef=cotizEditId?'Cot. #'+cotizEditId:'';
+  var nom=qList?(qList.cliente||'').trim():cliDom;
+  if(nom) noteRef=noteRef?noteRef+' — '+nom:nom;
+  var sn=document.getElementById('saleNote');
+  if(sn) sn.value=noteRef;
+  var nitEl=document.getElementById('saleNit');
+  if(nitEl){
+    var nt=qList?(qList.nit||'').trim():'';
+    if(nt) nitEl.value=nt;
+  }
   renderSaleCart();
   calcDescuento();
   searchSaleProducts();
@@ -4756,6 +4853,19 @@ function cotizBadgeClass(st){
   if(st==='cancelada'||st==='rechazada') return 'badge-purple';
   return 'badge-purple';
 }
+function cotizListaFechaHtml(c){
+  var d=c.ts?new Date(c.ts):null;
+  var ok=d&&!isNaN(d.getTime());
+  var fecha=ok?d.toLocaleDateString('es-GT'):(c.date||c.fecha||'');
+  var sub='';
+  if(ok) sub+='<div style="font-size:10px;color:var(--text2);">'+d.toLocaleTimeString('es-GT',{ hour:'2-digit', minute:'2-digit' })+'</div>';
+  if((c.status==='convertida'||c.status==='pedido')&&c.convertidoEnTs){
+    var dc=new Date(c.convertidoEnTs);
+    if(!isNaN(dc.getTime()))
+      sub+='<div style="font-size:10px;color:var(--teal-dk);margin-top:3px;font-weight:600;">Venta: '+dc.toLocaleString('es-GT')+'</div>';
+  }
+  return '<div style="line-height:1.35;">'+fecha+sub+'</div>';
+}
 function renderCotizacionesList(){
   var wrap=document.getElementById('cotizacionesTable'); if(!wrap) return;
   var f=document.getElementById('cotizFiltroEstado').value;
@@ -4774,7 +4884,7 @@ function renderCotizacionesList(){
       var badge=cotizBadgeClass(st);
       var canConf=canSell()&&(st==='pendiente'||st==='pendiente_abastecimiento');
       var delOk=st!=='pedido'&&st!=='convertida';
-      return '<tr><td>'+c.id+'</td><td style="font-size:11px">'+(c.date||'')+'</td><td>'+escapeHtmlLot(c.cliente||'')+'</td><td style="font-size:11px;color:var(--text2);">'+escapeHtmlLot(cotizElaboradoText(c))+'</td><td><span class="badge '+badge+'">'+cotizEstadoLabel(st)+'</span></td><td>'+fmt(c.total||0)+'</td><td style="white-space:nowrap;">'+
+      return '<tr><td>'+c.id+'</td><td style="font-size:11px;min-width:108px;">'+cotizListaFechaHtml(c)+'</td><td>'+escapeHtmlLot(c.cliente||'')+'</td><td style="font-size:11px;color:var(--text2);">'+escapeHtmlLot(cotizElaboradoText(c))+'</td><td><span class="badge '+badge+'">'+cotizEstadoLabel(st)+'</span></td><td>'+fmt(c.total||0)+'</td><td style="white-space:nowrap;">'+
         (canConf?'<button type="button" class="btn btn-sm btn-success" onclick="cotizPromptConfirmar('+c.id+')">Confirmar</button> ':'')+
         '<button type="button" class="btn btn-sm btn-secondary" onclick="cotizAbrir('+c.id+')">Abrir</button> <button type="button" class="btn btn-sm" onclick="cotizPdfDesdeList('+c.id+')">PDF</button> '+
         (delOk?'<button type="button" class="btn btn-sm btn-danger" onclick="cotizEliminar('+c.id+')">Eliminar</button>':'')+'</td></tr>';
