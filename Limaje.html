@@ -505,6 +505,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
             <option value="__legacy">Legado (otros)</option>
           </select>
           <button type="button" class="btn btn-sm btn-secondary" onclick="navigateTo('cotiz-historial')">📊 Historial SQL</button>
+          <button type="button" class="btn btn-sm btn-danger" id="cotizBtnPurgeCloud" style="display:none;" title="Solo súper admin (configurador)" onclick="void cotizConfiguradorPurgeAllCloud()">🧹 Vaciar cotizaciones (nube)</button>
         </div>
         <div class="table-wrap" id="cotizacionesTable"></div>
       </div>
@@ -899,7 +900,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
         <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeAudit"> Auditoría local</label>
         <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeWorkerPay"> Pagos a trabajadores (lista de pagos)</label>
         <label style="display:flex;align-items:center;gap:8px;margin:10px 0;cursor:pointer;font-size:13px;color:#c0392b;"><input type="checkbox" id="wipeLots"> <strong>Lotes</strong> (existencias por lote; el catálogo puede quedar desalineado hasta ajustar stock o volver a cargar lotes)</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeCotizLocal"> Cotizaciones <strong>locales</strong> (lista en este equipo; no borra filas en Supabase)</label>
+        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeCotizLocal"> Cotizaciones <strong>solo en este equipo</strong> (no borra Supabase; tras recargar datos pueden volver a aparecer — use en Cotizaciones «Vaciar cotizaciones (nube)» si es configurador)</label>
         <button type="button" class="btn btn-danger" style="margin-top:12px;" onclick="void limajeEjecutarLimpiezaPruebas()">Eliminar datos marcados</button>
       </div>
     </div>
@@ -1511,6 +1512,35 @@ function canAddProduct(){ return currentUser&&['admin','configurador','contador'
 function canAdjustStock(){ return currentUser&&['admin','configurador','contador','bodeguero','auxiliar_bodega'].indexOf(currentUser.role)>=0; }
 function canMarkCarteraPaid(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador'); }
 function canCloseCaja(){ return currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador'||currentUser.role==='contador'); }
+/** Laboratorio / reset: vaciar tabla cotizaciones en Supabase (el servidor comprueba el rol). */
+function canConfiguradorPurgeCotiz(){ return currentUser&&currentUser.role==='configurador'; }
+function cotizUpdatePurgeCloudButton(){
+  var b=document.getElementById('cotizBtnPurgeCloud');
+  if(b) b.style.display=canConfiguradorPurgeCotiz()?'inline-flex':'none';
+}
+async function cotizConfiguradorPurgeAllCloud(){
+  if(!canConfiguradorPurgeCotiz()) return alert2('Solo el súper admin (configurador) puede vaciar cotizaciones en el servidor.','error');
+  var LM=window.__limajeSqlCore;
+  if(!LM||!window.__limajeSupabase){ alert2('Sin conexión a la nube.','error'); return; }
+  if(!confirm('¿Eliminar TODAS las cotizaciones en Supabase y vaciar la lista en este equipo?\n\nNo deshace ventas ya registradas ni borra movimientos. Sí elimina reservas y colas de abastecimiento ligadas a cotizaciones.')) return;
+  if(!confirm('Segunda confirmación: se borrarán todas las filas de cotizaciones en el servidor.')) return;
+  try{
+    var out=await LM.purgeAllCotizacionesConfiguradorRpc();
+    if(out&&out.ok===false){ alert2(String(out.error||'Error'),'error'); return; }
+    DB.set('cotizaciones',[]);
+    try{ await persistFullLimajeState(); }catch(e){ console.warn(e); }
+    try{ await limajeRefreshStockMap(); }catch(e2){}
+    renderCotizacionesList();
+    var n=(out&&out.deleted!=null)?out.deleted:'—';
+    alert2('Listo. Cotizaciones borradas en servidor ('+n+' filas). Lista sincronizada.','success');
+    logAudit('cotiz_purge_cloud','Purge all cotizaciones SQL','cotizaciones',String(Date.now()));
+  }catch(e){
+    console.error(e);
+    var msg=String((e.message!=null?e.message:e)||e);
+    if(/configurador|solo el rol/i.test(msg)) msg='Solo el rol configurador puede ejecutar esta acción en el servidor. Ejecute el SQL nuevo (limaje_configurador_purge_all_cotizaciones) en Supabase si falta.';
+    alert2(msg,'error');
+  }
+}
 
 function initData(){
   if(!DB.get('categories')){
@@ -1810,7 +1840,7 @@ async function limajeRefreshCotizacionesFromSql(){
   var LM=window.__limajeSqlCore;
   if(!LM||!window.__limajeSupabase) return;
   var r=await LM.pullCotizaciones(limajeMapSqlRowToCotiz);
-  if(r.ok&&r.list&&r.list.length) DB.set('cotizaciones',r.list);
+  if(r.ok&&Array.isArray(r.list)) DB.set('cotizaciones',r.list);
 }
 async function limajeAfterSessionDataLoaded(){
   var LM=window.__limajeSqlCore;
@@ -5337,6 +5367,7 @@ function cotizListaFechaHtml(c){
 }
 function renderCotizacionesList(){
   var wrap=document.getElementById('cotizacionesTable'); if(!wrap) return;
+  cotizUpdatePurgeCloudButton();
   var f=document.getElementById('cotizFiltroEstado').value;
   var list=getCotizaciones().slice().sort(function(a,b){ return (Number(b.id)||0)-(Number(a.id)||0); });
   if(f) list=list.filter(function(x){

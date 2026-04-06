@@ -148,6 +148,14 @@
     return r.data;
   };
 
+  /** Solo rol configurador en servidor — borra todas las filas limaje_cotizaciones (+ reservas/demanda). */
+  L.purgeAllCotizacionesConfiguradorRpc = async function () {
+    var sb = L.getSb();
+    var r = await sb.rpc('limaje_configurador_purge_all_cotizaciones');
+    if (r.error) throw r.error;
+    return r.data;
+  };
+
   L.abastecimientoCubrirRpc = async function (productId, locationCode) {
     var sb = L.getSb();
     var r = await sb.rpc('limaje_abastecimiento_intentar_cubrir', {
