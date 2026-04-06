@@ -1,4 +1,5 @@
 /* LIMAJE — credenciales Supabase (obligatorio)
+ * Repositorio público: no commitear este archivo; use limaje-config.example.js como plantilla.
  *
  * 1) https://supabase.com → abre tu proyecto (o crea uno nuevo).
  * 2) ⚙ Project Settings → API:

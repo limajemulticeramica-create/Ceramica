@@ -1,6 +1,6 @@
 /* LIMAJE — service worker mínimo para instalación PWA (Netlify + HTTPS).
    Rutas relativas al scope del SW (sirve en raíz o en subcarpeta). */
-var CACHE = 'limaje-pwa-v12';
+var CACHE = 'limaje-pwa-v13';
 
 function limajeShellUrl() {
   return new URL('Limaje.html', self.registration.scope).href;
@@ -8,7 +8,7 @@ function limajeShellUrl() {
 
 function limajePrecacheList() {
   var base = self.registration.scope;
-  var files = ['Limaje.html', 'index.html', 'limaje-config.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'logo.png'];
+  var files = ['Limaje.html', 'index.html', 'limaje-config.js', 'limaje-modules.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'logo.png'];
   var out = files.map(function (f) {
     return new URL(f, base).href;
   });

@@ -180,15 +180,16 @@
       .join('');
   };
 
+  /** Tras inactividad: cierra sesión (Supabase) para volver a login con credenciales. Sin modal de PIN. */
   L.setupInactivityLock = function () {
     var ov = document.getElementById('limajeLockOverlay');
-    if (!ov) return;
+    if (ov) ov.classList.remove('visible');
     var timer = null;
     var reset = function () {
-      if (ov.classList.contains('visible')) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(function () {
-        ov.classList.add('visible');
+        if (typeof global.logout === 'function') void global.logout();
+        else if (global.__limajeSupabase && global.__limajeSupabase.auth) void global.__limajeSupabase.auth.signOut();
       }, L.inactivityMs());
     };
     ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'].forEach(function (ev) {
@@ -201,30 +202,6 @@
       );
     });
     reset();
-    var inp = document.getElementById('limajeLockPass');
-    var btn = document.getElementById('limajeLockUnlockBtn');
-    var err = document.getElementById('limajeLockErr');
-    if (btn) {
-      btn.onclick = async function () {
-        var prefs = global.DB.get('app_prefs', {});
-        var want = prefs.unlockPinSha256 || '';
-        if (!want) {
-          ov.classList.remove('visible');
-          if (err) err.textContent = '';
-          reset();
-          return;
-        }
-        var got = await L.sha256Hex((inp && inp.value) || '');
-        if (got !== want) {
-          if (err) err.textContent = 'Contraseña incorrecta.';
-          return;
-        }
-        ov.classList.remove('visible');
-        if (inp) inp.value = '';
-        if (err) err.textContent = '';
-        reset();
-      };
-    }
   };
 
   /** Módulo 6 — Presencia */

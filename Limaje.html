@@ -498,14 +498,11 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
           <select id="cotizFiltroEstado" onchange="renderCotizacionesList()">
             <option value="">Todos los estados</option>
             <option value="borrador">Borrador</option>
-            <option value="pendiente">Pendiente (reserva stock)</option>
+            <option value="pendiente">Reservado (aparta stock)</option>
             <option value="pendiente_abastecimiento">Pendiente abastecimiento</option>
-            <option value="convertida">Convertida a venta</option>
-            <option value="cancelada">Cancelada</option>
-            <option value="rechazada">Rechazada</option>
-            <option value="en_espera">En espera (histórico)</option>
-            <option value="confirmada">Confirmada (histórico)</option>
-            <option value="pedido">Pedido / cerrada (histórico)</option>
+            <option value="convertida">Convertida (venta)</option>
+            <option value="cancelada">Cancelado</option>
+            <option value="__legacy">Legado (otros)</option>
           </select>
           <button type="button" class="btn btn-sm btn-secondary" onclick="navigateTo('cotiz-historial')">📊 Historial SQL</button>
         </div>
@@ -521,16 +518,13 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
           <div class="form-group"><label>Teléfono</label><input type="text" id="cotizTel" placeholder="Opcional"></div>
           <div class="form-group"><label>Estado</label>
             <select id="cotizEstado" onchange="cotizOnEstadoChange()">
-              <option value="borrador">Borrador</option>
-              <option value="pendiente">Pendiente (reserva stock al guardar)</option>
-              <option value="pendiente_abastecimiento">Pendiente abastecimiento</option>
-              <option value="convertida">Convertida (venta generada)</option>
-              <option value="cancelada">Cancelada</option>
-              <option value="rechazada">Rechazada</option>
-              <option value="en_espera">En espera (legado)</option>
-              <option value="confirmada">Confirmada (legado)</option>
-              <option value="pedido">Pedido (cierra edición)</option>
+              <option value="borrador">Borrador (consulta; se puede borrar sin abrir)</option>
+              <option value="pendiente">Reservado (aparta stock al guardar en nube)</option>
+              <option value="pendiente_abastecimiento">Pendiente de abastecimiento</option>
+              <option value="cancelada">Cancelado (libera reserva si aplica)</option>
+              <option value="convertida" disabled>Convertida — solo tras confirmar venta</option>
             </select>
+            <small style="display:block;color:var(--text2);font-size:11px;margin-top:4px;">Cancelado = cliente ya no compra. Reservado = cantidad descontada del «disponible» mientras exista reserva.</small>
           </div>
         </div>
         <div class="form-group"><label>Validez / notas al cliente</label><textarea id="cotizNota" rows="2" placeholder="Condiciones, tiempo de entrega, texto para el PDF..."></textarea></div>
@@ -831,13 +825,30 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
         <p style="color:var(--text2);font-size:13px;">Los períodos <strong>cerrados</strong> bloquean edición de cotizaciones asociadas. Solo administración puede abrir/cerrar períodos.</p>
         <div class="table-wrap" id="periodosTable"></div>
       </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">📊 Resumen mensual / anual (local)</div>
+        <p style="color:var(--text2);font-size:12px;margin-bottom:10px;">Suma <strong>ventas</strong> e <strong>otros ingresos</strong> de movimientos, y <strong>egresos</strong> + <strong>pagos trabajadores</strong>, agrupado por año y mes. Los datos dependen de las fechas registradas en cada movimiento.</p>
+        <button type="button" class="btn btn-sm" onclick="renderArchivoContableResumen()">Actualizar vista</button>
+        <div id="archivoContableResumen" style="margin-top:14px;"></div>
+      </div>
     </div>
 
     <!-- Módulo 5 — CSV backup / restore -->
     <div class="page" id="page-backup-csv">
-      <div class="page-header"><h2>💾 Respaldo CSV</h2></div>
+      <div class="page-header"><h2>💾 Respaldo de datos</h2></div>
       <div class="card">
-        <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">Exportar o importar cotizaciones, ventas, compras/egresos e inventario. Use filtros de fecha donde aplique.</p>
+        <div class="card-title">📦 Respaldo completo (recomendado)</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:10px;">Un solo archivo <strong>.json</strong> con productos, movimientos, cartera, cotizaciones, lotes, etc. Equivale a «guardar todo el sistema». La importación <strong>reemplaza</strong> los datos del navegador (solo admin/configurador).</p>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px;">Mismo respaldo que en <strong>Utilidades → Usuarios</strong>; aquí puede descargarlo o restaurarlo sin cambiar de pantalla.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;">
+          <button type="button" class="btn btn-success" onclick="exportarJSON()">📤 Exportar todo (JSON)</button>
+          <label class="btn btn-secondary" style="cursor:pointer;margin:0;">📥 Importar JSON<input type="file" accept=".json" style="display:none;" onchange="importarJSON(event)"></label>
+        </div>
+        <div id="backupJsonImportResult" style="margin-top:12px;font-size:13px;"></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">📄 CSV por tipo (filtros de fecha)</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">Para Excel o enviar solo un extracto. No sustituye al JSON completo.</p>
         <div class="grid-2" style="gap:12px;">
           <div class="form-group"><label>Desde</label><input type="date" id="csvFrom"></div>
           <div class="form-group"><label>Hasta</label><input type="date" id="csvTo"></div>
@@ -871,10 +882,11 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     <div class="page" id="page-utilidades">
       <div class="page-header"><h2>🛠 Utilidades</h2></div>
       <div class="card">
-        <div class="card-title">Bloqueo por inactividad</div>
-        <p style="font-size:13px;color:var(--text2);">Minutos sin interacción antes de bloquear la pantalla (clic, tecla o mouse reinician el temporizador). La verificación usa SHA-256 local de la contraseña que defina abajo.</p>
-        <div class="form-group"><label>Minutos</label><input type="number" id="prefInactivityMin" min="1" max="240" value="15"></div>
-        <div class="form-group"><label>Nueva contraseña de desbloqueo</label><input type="password" id="prefUnlockPass" placeholder="Dejar vacío para no exigir PIN"></div>
+        <div class="card-title">Inactividad → cerrar sesión</div>
+        <p style="font-size:13px;color:var(--text2);">Tras los minutos indicados <strong>sin actividad</strong> (clic, tecla, scroll…), el sistema <strong>cierra la sesión de Supabase</strong> y vuelve a la pantalla de inicio de sesión. Ya no se usa pantalla de PIN: vuelva a entrar con su correo y contraseña.</p>
+        <div class="form-group"><label>Minutos hasta cerrar sesión</label><input type="number" id="prefInactivityMin" min="1" max="240" value="15"></div>
+        <p style="font-size:11px;color:var(--text2);">El campo de «PIN de desbloqueo» anterior ya no aplica; puede ignorarlo.</p>
+        <div class="form-group" style="display:none;"><label>Nueva contraseña de desbloqueo</label><input type="password" id="prefUnlockPass" placeholder="(no usado)"></div>
         <button type="button" class="btn btn-success" onclick="guardarPrefsBloqueo()">Guardar preferencias</button>
       </div>
     </div>
@@ -949,7 +961,13 @@ function filterPersistKeys(keys){
 }
 var SUPABASE_URL=(typeof window.LIMAJE_SUPABASE_URL==='string'&&window.LIMAJE_SUPABASE_URL)?window.LIMAJE_SUPABASE_URL:'';
 var SUPABASE_ANON_KEY=(typeof window.LIMAJE_SUPABASE_ANON_KEY==='string'&&window.LIMAJE_SUPABASE_ANON_KEY)?window.LIMAJE_SUPABASE_ANON_KEY:'';
-function limajeSupabaseConfigured(){ return SUPABASE_URL.length>12&&SUPABASE_ANON_KEY.length>30; }
+function limajeSupabaseConfigured(){
+  if(SUPABASE_URL.length<16||SUPABASE_ANON_KEY.length<40) return false;
+  if(SUPABASE_URL.indexOf('placeholder')>=0||SUPABASE_ANON_KEY.indexOf('placeholder')>=0) return false;
+  if(SUPABASE_URL.indexOf('http')!==0) return false;
+  if(SUPABASE_ANON_KEY.indexOf('eyJ')!==0) return false;
+  return true;
+}
 /** Recurso estático junto a Limaje.html (válido en raíz o subcarpeta). */
 function limajeAssetUrl(rel){ try{ return new URL(rel||'',location.href).href; }catch(e){ return rel||''; } }
 
@@ -1275,6 +1293,22 @@ function restoreLotsFIFO(pId,loc,qty){
   if((Number(qty)||0)<=STOCK_EPS) return;
   addQtyToLots(pId,loc,qty,'INICIAL');
 }
+/** Vista previa (solo lectura) de qué lotes saldrían primero por FIFO al vender qtyNeed cajas equiv. */
+function previewLotsFIFOConsumption(pId,loc,qtyNeed){
+  var need=Number(qtyNeed)||0;
+  if(need<=STOCK_EPS) return [];
+  var all=getLots().filter(function(l){ return l.productId===pId&&l.locationCode===loc&&(Number(l.qty)||0)>STOCK_EPS; })
+    .sort(function(a,b){ return (a.receivedAt||0)-(b.receivedAt||0); });
+  var rem=need, out=[];
+  all.forEach(function(lot){
+    if(rem<=STOCK_EPS) return;
+    var q=Number(lot.qty)||0;
+    var take=Math.min(q,rem);
+    if(take>STOCK_EPS) out.push({ lotCode:lot.lotCode, take:take, receivedAt:lot.receivedAt });
+    rem-=take;
+  });
+  return out;
+}
 /** Suma cantidades de lotes (cajas) por bodega → stockByLocation del producto */
 function syncStockFromLots(p){
   ensureStockByLoc(p);
@@ -1465,6 +1499,7 @@ async function requestPasswordReset(){
 async function logout(){
   if(window.__limajeSupabase) await window.__limajeSupabase.auth.signOut();
 }
+window.logout=logout;
 const isAdmin=()=>currentUser&&(currentUser.role==='admin'||currentUser.role==='configurador');
 
 // ============================================================
@@ -1477,7 +1512,7 @@ const NAV_ADMIN=[
   {id:'cartera',label:'💳 Cartera'},{id:'caja',label:'🏦 Caja'},
   {id:'movimientos',label:'↔ Movimientos'},{id:'reportes',label:'📄 Reportes'},{id:'documentos',label:'📁 Documentos'},
   {id:'trabajadores',label:'👷 Trabajadores'},{id:'auditoria',label:'📋 Auditoría'},{id:'actividad-sql',label:'🔐 Act. servidor'},
-  {id:'periodos',label:'📅 Períodos'},{id:'backup-csv',label:'💾 CSV'},{id:'utilidades',label:'🛠 Utilidades'},
+  {id:'periodos',label:'📅 Períodos'},{id:'backup-csv',label:'💾 Respaldo'},{id:'utilidades',label:'🛠 Utilidades'},
   {id:'usuarios',label:'👤 Usuarios'},
 ];
 const NAV_VENDEDOR=[
@@ -1487,7 +1522,7 @@ const NAV_VENDEDOR=[
   {id:'cartera',label:'💳 Cartera'},
   {id:'caja',label:'🏦 Caja'},
   {id:'movimientos',label:'🧾 Mis Ventas'},
-  {id:'documentos',label:'📁 Documentos'},{id:'backup-csv',label:'💾 CSV'},{id:'utilidades',label:'🛠 Utilidades'},
+  {id:'documentos',label:'📁 Documentos'},{id:'backup-csv',label:'💾 Respaldo'},{id:'utilidades',label:'🛠 Utilidades'},
 ];
 const NAV_BODEGUERO=[
   {id:'dashboard',label:'📊 Dashboard'},
@@ -1501,7 +1536,7 @@ const NAV_AUX_BOD=[
 function getNavForUser(){
   const r=currentUser&&currentUser.role;
   if(r==='admin'||r==='configurador'||r==='contador') return NAV_ADMIN;
-  if(r==='bodeguero') return NAV_BODEGUERO.concat([{id:'backup-csv',label:'💾 CSV'},{id:'utilidades',label:'🛠 Utilidades'}]);
+  if(r==='bodeguero') return NAV_BODEGUERO.concat([{id:'backup-csv',label:'💾 Respaldo'},{id:'utilidades',label:'🛠 Utilidades'}]);
   if(r==='auxiliar_bodega') return NAV_AUX_BOD.concat([{id:'utilidades',label:'🛠 Utilidades'}]);
   return NAV_VENDEDOR;
 }
@@ -1558,7 +1593,7 @@ function navigateTo(id){
     if(id==='auditoria')renderAuditoria();
     if(id==='usuarios')void renderUsers();
     if(id==='cotiz-historial'){cotHistInitDates();void cotHistLoad(true);}
-    if(id==='periodos')void renderPeriodosPage();
+    if(id==='periodos'){ void renderPeriodosPage(); renderArchivoContableResumen(); }
     if(id==='backup-csv')csvInitDates();
     if(id==='actividad-sql')void renderActividadSql();
     if(id==='utilidades')loadPrefsBloqueoUi();
@@ -1657,6 +1692,13 @@ async function limajeAfterSessionDataLoaded(){
     (per||[]).forEach(function(p){ __limajePeriodoCerradoMap[p.id]=!!p.cerrado; });
     await limajeRefreshCotizacionesFromSql();
   }catch(e){ console.warn('limajeAfterSession',e); }
+  try{
+    await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+  }catch(syncErr){
+    console.warn('limaje syncStockPhysical al iniciar',syncErr);
+    await new Promise(function(r){ setTimeout(r,1800); });
+    try{ await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES); }catch(sync2){ console.warn('limaje syncStockPhysical reintento',sync2); }
+  }
   try{ await limajeRefreshStockMap(); }catch(e){}
   try{ LM.setupInactivityLock(); }catch(e2){}
 }
@@ -1736,6 +1778,62 @@ async function togglePeriodoCerrado(id, cerrado){
     renderPeriodosPage();
     alert2('Período actualizado','success');
   }catch(e){ alert2(String(e.message||e),'error'); }
+}
+function renderArchivoContableResumen(){
+  var el=document.getElementById('archivoContableResumen');
+  if(!el) return;
+  var mvs=getMovements();
+  var byYear={};
+  function ensure(y,mo){
+    if(!byYear[y]) byYear[y]={ months:{} };
+    if(!byYear[y].months[mo]) byYear[y].months[mo]={ ventas:0, ingresosOtros:0, egresos:0, abonos:0, days:{} };
+    return byYear[y].months[mo];
+  }
+  function addDay(cell,d,field,amt){
+    if(!d||d.length<10) return;
+    var day=d.slice(0,10);
+    if(!cell.days[day]) cell.days[day]={ ventas:0, ingresosOtros:0, egresos:0, abonos:0 };
+    cell.days[day][field]=(cell.days[day][field]||0)+amt;
+  }
+  mvs.forEach(function(m){
+    var d=m.date||'';
+    if(d.length<7) return;
+    var y=d.slice(0,4), mo=parseInt(d.slice(5,7),10);
+    if(!mo||mo>12) return;
+    var t=Number(m.total)||0;
+    var cell=ensure(y,mo);
+    if(m.type==='venta'){ cell.ventas+=t; addDay(cell,d,'ventas',t); }
+    else if(m.type==='ingreso'){ cell.ingresosOtros+=t; addDay(cell,d,'ingresosOtros',t); }
+    else if(m.type==='egreso'){ cell.egresos+=t; addDay(cell,d,'egresos',t); }
+    else if(m.type==='abono'){ cell.abonos+=t; addDay(cell,d,'abonos',t); }
+  });
+  var years=Object.keys(byYear).sort().reverse();
+  var mesNom=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  if(!years.length){ el.innerHTML='<p style="color:var(--text2);">Sin movimientos con fecha para armar el resumen.</p>'; return; }
+  el.innerHTML=years.map(function(y){
+    var M=byYear[y].months;
+    var moKeys=[];
+    for(var k=1;k<=12;k++) moKeys.push(k);
+    var yVent=moKeys.reduce(function(s,mo){ var c=M[mo]||{}; return s+(c.ventas||0)+(c.ingresosOtros||0)+(c.abonos||0); },0);
+    var yEgr=moKeys.reduce(function(s,mo){ var c=M[mo]||{}; return s+(c.egresos||0); },0);
+    var rows=moKeys.map(function(mo){
+      var cell=M[mo]||{ ventas:0,ingresosOtros:0,egresos:0,abonos:0,days:{} };
+      var ing=(cell.ventas||0)+(cell.ingresosOtros||0)+(cell.abonos||0);
+      var egr=(cell.egresos||0);
+      var net=ing-egr;
+      var dayKeys=Object.keys(cell.days||{}).sort();
+      var dayRows=dayKeys.length?('<details style="margin:8px 0 0 12px;font-size:12px;"><summary style="cursor:pointer;color:var(--teal-dk);">Por día ('+mesNom[mo]+')</summary><table style="margin-top:6px;width:100%;max-width:520px;"><thead><tr><th>Día</th><th>Ventas</th><th>Otros ing.</th><th>Abonos</th><th>Egresos</th><th>Neto día</th></tr></thead><tbody>'+
+        dayKeys.map(function(day){
+          var dd=cell.days[day];
+          var ding=(dd.ventas||0)+(dd.ingresosOtros||0)+(dd.abonos||0);
+          var degr=dd.egresos||0;
+          return '<tr><td>'+escapeHtml(day)+'</td><td class="monto-ingreso">'+fmt(dd.ventas||0)+'</td><td class="monto-ingreso">'+fmt(dd.ingresosOtros||0)+'</td><td class="monto-ingreso">'+fmt(dd.abonos||0)+'</td><td class="monto-egreso">'+fmt(degr)+'</td><td><strong>'+fmt(ding-degr)+'</strong></td></tr>';
+        }).join('')+'</tbody></table></details>'):'';
+      return '<tr><td><strong>'+mesNom[mo]+'</strong></td><td class="monto-ingreso">'+fmt(ing)+'</td><td class="monto-egreso">'+fmt(egr)+'</td><td><strong>'+fmt(net)+'</strong></td></tr>'+
+        '<tr class="archivo-dia-row"><td colspan="4" style="border:none;padding:0 0 12px 0;">'+dayRows+'</td></tr>';
+    }).join('');
+    return '<div style="margin-bottom:28px;border-bottom:1px solid var(--border);padding-bottom:16px;"><div style="font-weight:700;color:var(--teal-dk);margin-bottom:10px;">Año '+y+' — Ingresos (ventas + otros + abonos) '+fmt(yVent)+' · Egresos '+fmt(yEgr)+' · <span style="border-bottom:2px solid var(--teal);">Neto año '+fmt(yVent-yEgr)+'</span></div><table style="width:100%;max-width:720px;"><thead><tr><th>Mes</th><th>Ingresos</th><th>Egresos</th><th>Neto mes</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }).join('');
 }
 function csvExport(kind){
   var LM=window.__limajeSqlCore;var from=(document.getElementById('csvFrom')&&document.getElementById('csvFrom').value)||'';var to=(document.getElementById('csvTo')&&document.getElementById('csvTo').value)||'';
@@ -1829,11 +1927,10 @@ function loadPrefsBloqueoUi(){
 async function guardarPrefsBloqueo(){
   var p=DB.get('app_prefs',{});
   p.inactivityLockMinutes=parseInt(document.getElementById('prefInactivityMin').value,10)||15;
-  var pass=(document.getElementById('prefUnlockPass')&&document.getElementById('prefUnlockPass').value)||'';
-  if(pass) p.unlockPinSha256=await window.__limajeSqlCore.sha256Hex(pass);
-  else delete p.unlockPinSha256;
+  delete p.unlockPinSha256;
   DB.set('app_prefs',p);
-  document.getElementById('prefUnlockPass').value='';
+  var pu=document.getElementById('prefUnlockPass');
+  if(pu) pu.value='';
   alert2('Preferencias guardadas','success');
 }
 function limajeOnPresenceRemote(){
@@ -1849,11 +1946,11 @@ function limajeOnPresenceRemote(){
 function cotizEstadoLabel(s){
   var m={
     borrador:'Borrador',
-    pendiente:'Pendiente',
+    pendiente:'Reservado',
     pendiente_abastecimiento:'Pend. abastecimiento',
     convertida:'Convertida',
-    cancelada:'Cancelada',
-    rechazada:'Rechazada',
+    cancelada:'Cancelado',
+    rechazada:'Cancelado',
     en_espera:'En espera',
     confirmada:'Confirmada',
     pedido:'Pedido'
@@ -1865,7 +1962,6 @@ function cotizEsEditable(q){
   if(q.periodoCerrado) return false;
   var st=q.status;
   if(st==='pedido'||st==='convertida'||st==='cancelada'||st==='rechazada') return false;
-  if(st==='pendiente_abastecimiento') return false;
   return true;
 }
 function getCatName(id){const c=getCategories().find(c=>c.id===id);return c?c.name:'—';}
@@ -1897,8 +1993,23 @@ function logAudit(accion,detalle,entidad,entidadId){
 // ============================================================
 // DASHBOARD
 // ============================================================
+function updateDashboardClockOnly(){
+  var d=new Date();
+  var f=document.getElementById('dashDtFecha');
+  var h=document.getElementById('dashDtHora');
+  if(!f||!h) return;
+  f.textContent=d.toLocaleDateString('es-GT',{ weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'America/Guatemala' });
+  h.textContent=d.toLocaleTimeString('es-GT',{ hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone:'America/Guatemala' });
+}
 function renderDashboard(){
-  document.getElementById('dashDate').textContent=new Date().toLocaleDateString('es-GT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var d0=new Date();
+  document.getElementById('dashDate').innerHTML='<span id="dashDtFecha">'+d0.toLocaleDateString('es-GT',{ weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'America/Guatemala' })+'</span> · <strong id="dashDtHora" style="color:var(--teal-dk);">'+d0.toLocaleTimeString('es-GT',{ hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone:'America/Guatemala' })+'</strong> <span style="color:var(--text2);font-size:11px;">(Guatemala)</span>';
+  if(typeof window.__limajeDashClockTimer==='undefined'){
+    window.__limajeDashClockTimer=setInterval(function(){
+      var pg=document.getElementById('page-dashboard');
+      if(pg&&pg.classList.contains('active')) updateDashboardClockOnly();
+    },1000);
+  }
   const mvs=getMovements();
   const ventasHoy=mvs.filter(m=>m.type==='venta'&&m.date===today());
   const ventas=mvs.filter(m=>m.type==='venta');
@@ -2638,7 +2749,23 @@ function renderSaleCart(){
       }else{
         qtyCell='<input type="number" value="'+(Number(c.qty)||0)+'" min="0.0001" step="0.001" style="width:64px;padding:4px 6px;" onchange="updateCartQty('+c.lineId+',this.value)"> cj.';
       }
-      return '<tr><td><span style="font-size:11px;color:var(--text2)">'+c.code+'</span><br><strong>'+c.name+'</strong></td><td><select class="sale-loc-sel" style="font-size:11px;max-width:130px;padding:4px;" onchange="changeCartLineLocation('+c.lineId+',this.value)">'+locSel(c)+'</select></td><td>'+unitCell+'</td><td>'+qtyCell+'</td><td><span class="precio-venta">'+fmt(pu)+(mode==='m2'?'/m²':mode==='piezas'?'/pz':'')+'</span></td><td><strong>'+fmt(saleLineSubtotal(c))+'</strong></td><td><button class="btn btn-sm btn-danger" onclick="removeFromCart('+c.lineId+')">✕</button></td></tr>';
+      var fifoHint='';
+      if(p){
+        var needC=saleLineCajas(c);
+        var locU=c.locationCode||'LOCAL';
+        var pv=previewLotsFIFOConsumption(c.id,locU,needC);
+        if(pv.length){
+          fifoHint='<div style="font-size:10px;color:var(--text2);margin-top:4px;max-width:260px;line-height:1.35;">📦 FIFO: '+pv.map(function(x){
+            return escapeHtmlLot(String(x.lotCode||'—'))+' −'+fmtStockCajas(x.take)+' cj. · '+(x.receivedAt?new Date(x.receivedAt).toLocaleString('es-GT'):'—');
+          }).join(' → ')+'</div>';
+        }else if(needC>STOCK_EPS) fifoHint='<div style="font-size:10px;color:var(--amber);margin-top:4px;">Sin lotes en '+LOC_LABELS[locU]+'; el descuento usa stock agregado.</div>';
+        if(p&&cotizProductSupportsM2(p)&&(mode==='m2'||mode==='piezas'||mode==='cajas')){
+          var m2b=Number(p.m2PerBox)||0, pzb=Number(p.piecesPerBox)||0;
+          var eqM2=needC*m2b, eqPz=needC*pzb;
+          if(m2b>0||pzb>0) fifoHint+='<div style="font-size:10px;color:var(--text2);margin-top:2px;">Equiv. venta: ~'+fmtStockCajas(needC)+' cj. · ~'+(m2b>0?eqM2.toFixed(2)+' m²':'')+(m2b>0&&pzb>0?' · ':'')+(pzb>0?Math.round(eqPz)+' pzs':'')+'</div>';
+        }
+      }
+      return '<tr><td><span style="font-size:11px;color:var(--text2)">'+c.code+'</span><br><strong>'+c.name+'</strong>'+fifoHint+'</td><td><select class="sale-loc-sel" style="font-size:11px;max-width:130px;padding:4px;" onchange="changeCartLineLocation('+c.lineId+',this.value)">'+locSel(c)+'</select></td><td>'+unitCell+'</td><td>'+qtyCell+'</td><td><span class="precio-venta">'+fmt(pu)+(mode==='m2'?'/m²':mode==='piezas'?'/pz':'')+'</span></td><td><strong>'+fmt(saleLineSubtotal(c))+'</strong></td><td><button class="btn btn-sm btn-danger" onclick="removeFromCart('+c.lineId+')">✕</button></td></tr>';
     }).join('')}</tbody></table>`;
   document.getElementById('saleCartTotal').innerHTML=`
     <div style="background:var(--teal-xs);border-radius:8px;padding:9px 13px;display:flex;justify-content:space-between;align-items:center;">
@@ -3935,6 +4062,7 @@ function cotizEditorNuevo(){
   document.getElementById('cotizNit').value='';
   document.getElementById('cotizTel').value='';
   document.getElementById('cotizNota').value='';
+  cotizResetEstadoSelect();
   document.getElementById('cotizEstado').value='borrador';
   document.getElementById('cotizDesc').value='0';
   document.getElementById('cotizFotoInput').value='';
@@ -3959,9 +4087,23 @@ function cotizSetEditorEnabled(on){
   document.getElementById('cotizBtnPdf').disabled=false;
 }
 function cotizOnEstadoChange(){
-  var st=document.getElementById('cotizEstado').value;
-  if(st==='pedido' && !confirm('Al marcar como Pedido la cotización dejará de ser editable. ¿Continuar?')){
-    document.getElementById('cotizEstado').value='confirmada';
+}
+function cotizResetEstadoSelect(){
+  var s=document.getElementById('cotizEstado');
+  if(!s) return;
+  s.innerHTML='<option value="borrador">Borrador (consulta; se puede borrar sin abrir)</option>'+
+    '<option value="pendiente">Reservado (aparta stock al guardar en nube)</option>'+
+    '<option value="pendiente_abastecimiento">Pendiente de abastecimiento</option>'+
+    '<option value="cancelada">Cancelado (libera reserva si aplica)</option>'+
+    '<option value="convertida" disabled>Convertida — solo tras confirmar venta</option>';
+}
+function cotizEnsureEstadoOption(val,label,dis){
+  var s=document.getElementById('cotizEstado'); if(!s||!val) return;
+  var has=Array.prototype.some.call(s.options,function(o){ return o.value===val; });
+  if(!has){
+    var opt=document.createElement('option');
+    opt.value=val; opt.textContent=label||val; if(dis) opt.disabled=true;
+    s.appendChild(opt);
   }
 }
 function cotizAbrir(id){
@@ -3977,6 +4119,10 @@ function cotizAbrir(id){
   document.getElementById('cotizNit').value=q.nit||'';
   document.getElementById('cotizTel').value=q.telefono||'';
   document.getElementById('cotizNota').value=q.nota||'';
+  cotizResetEstadoSelect();
+  ['convertida','pedido','rechazada','en_espera','confirmada'].forEach(function(legacy){
+    if(q.status===legacy) cotizEnsureEstadoOption(legacy,cotizEstadoLabel(legacy),true);
+  });
   document.getElementById('cotizEstado').value=q.status||'borrador';
   document.getElementById('cotizDesc').value=q.descuento||0;
   cotizFotoSesion=null;
@@ -4184,11 +4330,15 @@ async function cotizGuardar(){
   var total=Math.max(0,sub-descuento);
   var list=getCotizaciones();
   var prev=null, idx=-1;
+  var prevSnapshot=null;
+  var wasNew=!cotizEditId;
+  var newLocalId=null;
   if(cotizEditId){
     idx=list.findIndex(function(x){ return x.id===cotizEditId; });
     if(idx<0) return;
     prev=list[idx];
     if(!cotizEsEditable(prev)) return alert2('Cotización no editable','error');
+    try{ prevSnapshot=JSON.parse(JSON.stringify(prev)); }catch(e){ prevSnapshot=Object.assign({},prev); }
   }
   var base={
     cliente:cliente,nit:nit,telefono:telefono,nota:nota,status:status,descuento:descuento,subtotal:sub,total:total,
@@ -4205,6 +4355,7 @@ async function cotizGuardar(){
     var nq=Object.assign({ id:nid, historial:[], creadoPor:(currentUser&&currentUser.username)||'sistema' },base);
     cotizPushHistorial(nq,'Creación','Cotización creada · '+fmt(total));
     list.push(nq);
+    newLocalId=nid;
     cotizEditId=nid;
     document.getElementById('cotizEditorTitle').textContent='Cotización #'+nid;
   }
@@ -4213,6 +4364,7 @@ async function cotizGuardar(){
   var row=list[ri];
   var LM=window.__limajeSqlCore;
   var sb=window.__limajeSupabase;
+  var cloudWriteOk=false;
   if(sb&&LM){
     try{
       await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
@@ -4250,6 +4402,7 @@ async function cotizGuardar(){
         periodo_granularidad:'mes'
       };
       var up=await LM.upsertCotizacionRpc(payload);
+      cloudWriteOk=true;
       row.sqlId=up.id;
       if(up.numero_serial!=null){ row.id=up.numero_serial; cotizEditId=up.numero_serial; document.getElementById('cotizEditorTitle').textContent='Cotización #'+up.numero_serial; }
       var prevSt=prev&&prev.status;
@@ -4261,6 +4414,9 @@ async function cotizGuardar(){
         });
         if(lines.length) await LM.reservarRpc(row.sqlId, lines);
       }
+      if(status==='cancelada'&&prevSt==='pendiente_abastecimiento'&&sb&&row.sqlId){
+        try{ await sb.from('limaje_demanda_linea').delete().eq('cotizacion_id',row.sqlId); }catch(eDem){ console.warn(eDem); }
+      }
       list[ri]=row;
     }catch(err){
       console.error(err);
@@ -4268,7 +4424,26 @@ async function cotizGuardar(){
       var extra='';
       if(em.indexOf('insuficiente')>=0||em.indexOf('Stock disponible')>=0)
         extra='\n\nLa nube reserva por bodega (Local, B1, B2). El Σ del catálogo suma las tres; si el material está en B2 y la línea apuntaba a Local, falla hasta reasignar bodega (se hace al guardar). Si otra cotización «Pendiente» ya reservó, el disponible baja.';
+      if(!cloudWriteOk){
+        if(prevSnapshot){
+          var ix=list.findIndex(function(x){ return x.id===prevSnapshot.id; });
+          if(ix>=0) list[ix]=prevSnapshot;
+          cotizEditId=prevSnapshot.id;
+          document.getElementById('cotizEditorTitle').textContent='Cotización #'+prevSnapshot.id;
+        }else if(wasNew&&newLocalId!=null){
+          list=list.filter(function(x){ return x.id!==newLocalId; });
+          cotizEditId=null;
+          cotizLineas=[];
+          document.getElementById('cotizEditorTitle').textContent='Nueva cotización';
+        }
+        DB.set('cotizaciones',list);
+      }else{
+        try{ await limajeRefreshCotizacionesFromSql(); }catch(pullE){ console.warn(pullE); }
+      }
+      try{ await limajeRefreshStockMap(); }catch(eM){}
       alert2('Nube: '+em+extra,'error');
+      if(cotizEditId) try{ cotizAbrir(cotizEditId); }catch(eA){ cotizVolverLista(); }
+      else cotizVolverLista();
       return;
     }
   }
@@ -4827,14 +5002,52 @@ function cotizCargarEnVenta(){
   if(miss.length) msg+=' Omitidos: '+miss.join(', ');
   alert2(msg);
 }
+function cotizBorrarBorrador(id){
+  var q=getCotizaciones().find(function(x){ return x.id===id; });
+  if(!q||q.status!=='borrador') return alert2('Solo se borran cotizaciones en borrador desde el listado.','error');
+  void cotizEliminar(id);
+}
+async function cotizMarcarCancelada(id){
+  if(!canSell()) return;
+  if(!confirm('¿Cancelar esta cotización? Se libera la reserva en nube (Reservado) o la fila de abastecimiento.')) return;
+  var list=getCotizaciones();
+  var q=list.find(function(x){ return x.id===id; });
+  if(!q) return;
+  var sb=window.__limajeSupabase;
+  var LM=window.__limajeSqlCore;
+  if(q.sqlId&&LM){
+    try{
+      if(q.status==='pendiente') await LM.liberarReservaRpc(q.sqlId);
+      if(q.status==='pendiente_abastecimiento'&&sb) await sb.from('limaje_demanda_linea').delete().eq('cotizacion_id',q.sqlId);
+      if(sb){
+        var ur=await sb.from('limaje_cotizaciones').update({ status:'cancelada', updated_at:new Date().toISOString() }).eq('id',q.sqlId);
+        if(ur.error) throw ur.error;
+      }
+    }catch(e){ console.warn(e); alert2('Nube: '+(e.message||e),'error'); return; }
+  }
+  var ix=list.findIndex(function(x){ return x.id===id; });
+  if(ix>=0){
+    list[ix]=Object.assign({},list[ix],{ status:'cancelada', actualizadoPor:(currentUser&&currentUser.username)||'' });
+    cotizPushHistorial(list[ix],'Cancelado','Desde listado · reserva liberada');
+  }
+  DB.set('cotizaciones',list);
+  try{ await limajeRefreshStockMap(); await flushPersistQueue(); }catch(e2){}
+  try{ renderInventario(); renderProducts(); }catch(e3){}
+  if(cotizEditId===id) cotizAbrir(id);
+  else renderCotizacionesList();
+  alert2('Cancelado · disponible actualizado');
+}
 async function cotizEliminar(id){
   if(!canSell()) return;
   if(!confirm('¿Eliminar esta cotización?')) return;
   var q=getCotizaciones().find(function(x){ return x.id===id; });
-  if(q&&q.sqlId&&window.__limajeSupabase){
+  var sb=window.__limajeSupabase;
+  var LM=window.__limajeSqlCore;
+  if(q&&q.sqlId&&sb&&LM){
     try{
-      if(q.status==='pendiente') await window.__limajeSqlCore.liberarReservaRpc(q.sqlId);
-      await window.__limajeSupabase.from('limaje_cotizaciones').delete().eq('id',q.sqlId);
+      if(q.status==='pendiente') await LM.liberarReservaRpc(q.sqlId);
+      if(q.status==='pendiente_abastecimiento') await sb.from('limaje_demanda_linea').delete().eq('cotizacion_id',q.sqlId);
+      await sb.from('limaje_cotizaciones').delete().eq('id',q.sqlId);
     }catch(e){ console.warn(e); }
   }
   var list=getCotizaciones().filter(function(x){ return x.id!==id; });
@@ -4871,6 +5084,7 @@ function renderCotizacionesList(){
   var f=document.getElementById('cotizFiltroEstado').value;
   var list=getCotizaciones().slice().sort(function(a,b){ return (Number(b.id)||0)-(Number(a.id)||0); });
   if(f) list=list.filter(function(x){
+    if(f==='__legacy') return ['rechazada','en_espera','confirmada','pedido'].indexOf(x.status)>=0;
     if(f==='en_espera') return x.status==='en_espera'||x.status==='pendiente';
     return x.status===f;
   });
@@ -4883,11 +5097,15 @@ function renderCotizacionesList(){
       var st=c.status;
       var badge=cotizBadgeClass(st);
       var canConf=canSell()&&(st==='pendiente'||st==='pendiente_abastecimiento');
-      var delOk=st!=='pedido'&&st!=='convertida';
-      return '<tr><td>'+c.id+'</td><td style="font-size:11px;min-width:108px;">'+cotizListaFechaHtml(c)+'</td><td>'+escapeHtmlLot(c.cliente||'')+'</td><td style="font-size:11px;color:var(--text2);">'+escapeHtmlLot(cotizElaboradoText(c))+'</td><td><span class="badge '+badge+'">'+cotizEstadoLabel(st)+'</span></td><td>'+fmt(c.total||0)+'</td><td style="white-space:nowrap;">'+
-        (canConf?'<button type="button" class="btn btn-sm btn-success" onclick="cotizPromptConfirmar('+c.id+')">Confirmar</button> ':'')+
-        '<button type="button" class="btn btn-sm btn-secondary" onclick="cotizAbrir('+c.id+')">Abrir</button> <button type="button" class="btn btn-sm" onclick="cotizPdfDesdeList('+c.id+')">PDF</button> '+
-        (delOk?'<button type="button" class="btn btn-sm btn-danger" onclick="cotizEliminar('+c.id+')">Eliminar</button>':'')+'</td></tr>';
+      var btns=[];
+      if(st==='borrador'&&canSell()) btns.push('<button type="button" class="btn btn-sm btn-danger" onclick="cotizBorrarBorrador('+c.id+')">Borrar</button>');
+      if(canConf) btns.push('<button type="button" class="btn btn-sm btn-success" onclick="cotizPromptConfirmar('+c.id+')">Confirmar venta</button>');
+      if(canSell()&&(st==='pendiente'||st==='pendiente_abastecimiento')) btns.push('<button type="button" class="btn btn-sm btn-secondary" onclick="void cotizMarcarCancelada('+c.id+')">Cancelar</button>');
+      btns.push('<button type="button" class="btn btn-sm btn-secondary" onclick="cotizAbrir('+c.id+')">Abrir</button>');
+      btns.push('<button type="button" class="btn btn-sm" onclick="cotizPdfDesdeList('+c.id+')">PDF</button>');
+      if(st!=='borrador'&&st!=='convertida'&&st!=='pedido'&&['pendiente','pendiente_abastecimiento'].indexOf(st)<0)
+        btns.push('<button type="button" class="btn btn-sm btn-danger" onclick="cotizEliminar('+c.id+')">Eliminar</button>');
+      return '<tr><td>'+c.id+'</td><td style="font-size:11px;min-width:108px;">'+cotizListaFechaHtml(c)+'</td><td>'+escapeHtmlLot(c.cliente||'')+'</td><td style="font-size:11px;color:var(--text2);">'+escapeHtmlLot(cotizElaboradoText(c))+'</td><td><span class="badge '+badge+'">'+cotizEstadoLabel(st)+'</span></td><td>'+fmt(c.total||0)+'</td><td style="white-space:nowrap;">'+btns.join(' ')+'</td></tr>';
     }).join('')+'</tbody></table>';
 }
 function cotizPdfDesdeList(id){
@@ -5277,7 +5495,10 @@ function importarJSON(event){
   const file = event.target.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = function(e){
-    const res = document.getElementById('importResult');
+    var inp = event.target;
+    var onBackup = inp && inp.closest && inp.closest('#page-backup-csv');
+    var res = onBackup ? document.getElementById('backupJsonImportResult') : document.getElementById('importResult');
+    if (!res) res = document.getElementById('importResult') || document.getElementById('backupJsonImportResult');
     try{
       const raw = JSON.parse(e.target.result);
 
