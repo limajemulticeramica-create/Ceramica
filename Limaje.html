@@ -1233,6 +1233,11 @@ function valById(id){var e=document.getElementById(id);return e?e.value:'';}
 
 const LOC_CODES=['LOCAL','BOD1','BOD2'];
 const LOC_LABELS={LOCAL:'Local',BOD1:'Bodega 1',BOD2:'Bodega 2'};
+function limajeLocLabelDisplay(code){
+  if(!code) return '';
+  if(LOC_LABELS[code]) return LOC_LABELS[code];
+  return String(code).split('+').map(function(x){ return LOC_LABELS[x]||x; }).join(' + ');
+}
 function ensureStockByLoc(p){
   if(!p.stockByLocation) p.stockByLocation={LOCAL:0,BOD1:0,BOD2:0};
   LOC_CODES.forEach(function(k){ if(p.stockByLocation[k]==null||p.stockByLocation[k]==='') p.stockByLocation[k]=0; });
@@ -1321,6 +1326,93 @@ function previewLotsFIFOConsumption(pId,loc,qtyNeed){
     rem-=take;
   });
   return out;
+}
+/** FIFO entre todas las bodegas: orden por fecha de ingreso, desempate LOCAL→B1→B2 y código de lote. */
+function globalFifoPlanFromLots(pId,needCajas){
+  var needRem=Number(needCajas)||0;
+  if(needRem<=STOCK_EPS) return { plan:[], shortfall:0 };
+  var locOrder={ LOCAL:0,BOD1:1,BOD2:2 };
+  var lots=getLots().filter(function(l){
+    return String(l.productId)===String(pId)&&LOC_CODES.indexOf(l.locationCode||'LOCAL')>=0&&(Number(l.qty)||0)>STOCK_EPS;
+  }).sort(function(a,b){
+    var t=(a.receivedAt||0)-(b.receivedAt||0);
+    if(t!==0) return t;
+    var o=(locOrder[a.locationCode]!=null?locOrder[a.locationCode]:9)-(locOrder[b.locationCode]!=null?locOrder[b.locationCode]:9);
+    if(o!==0) return o;
+    return String(a.lotCode||'').localeCompare(String(b.lotCode||''));
+  });
+  var plan=[];
+  lots.forEach(function(l){
+    if(needRem<=STOCK_EPS) return;
+    var q=Number(l.qty)||0;
+    var take=Math.min(q,needRem);
+    if(take>STOCK_EPS){
+      plan.push({ locationCode:l.locationCode||'LOCAL', lotId:l.id, lotCode:l.lotCode, take:take, receivedAt:l.receivedAt });
+      needRem-=take;
+    }
+  });
+  return { plan:plan, shortfall:needRem };
+}
+function limajeTotalDisponibleProduct(p){
+  if(!p) return 0;
+  return LOC_CODES.reduce(function(s,c){ return s+limajeDisponibleEnBodega(p,c); },0);
+}
+function deductLotsFromGlobalPlan(pId,plan){
+  if(!plan||!plan.length) return;
+  var all=getLots();
+  plan.forEach(function(seg){
+    var idx=all.findIndex(function(l){ return l.id===seg.lotId; });
+    if(idx<0) return;
+    all[idx].qty=(Number(all[idx].qty)||0)-seg.take;
+  });
+  saveLots(all.filter(function(l){
+    if(String(l.productId)===String(pId)) return (Number(l.qty)||0)>STOCK_EPS;
+    return true;
+  }));
+}
+function clampProductStockNonNegative(p){
+  ensureStockByLoc(p);
+  var ch=false;
+  LOC_CODES.forEach(function(c){
+    if((Number(p.stockByLocation[c])||0)<0){ p.stockByLocation[c]=0; ch=true; }
+  });
+  if(ch) recomputeStockTotal(p);
+}
+/** Reparte el plan FIFO global entre líneas de venta (mismo producto en varias filas). */
+function enrichSaleItemsWithGlobalFifo(lineItems,plans){
+  var queues={};
+  Object.keys(plans).forEach(function(pid){
+    queues[String(pid)]=(plans[pid]||[]).map(function(s){ return Object.assign({},s,{ rem:s.take }); });
+  });
+  function takeFromQueue(pidStr,need){
+    var q=queues[pidStr];
+    if(!q||!q.length) return [];
+    var out=[], remNeed=Number(need)||0;
+    while(remNeed>STOCK_EPS && q.length){
+      var seg=q[0];
+      var t=Math.min(seg.rem,remNeed);
+      if(t>STOCK_EPS){
+        out.push({ lotCode:seg.lotCode, cajas:t, ingreso:seg.receivedAt, locationCode:seg.locationCode });
+        seg.rem-=t;
+        remNeed-=t;
+      }
+      if(seg.rem<=STOCK_EPS) q.shift();
+    }
+    return out;
+  }
+  return lineItems.map(function(it){
+    var pid=it.id;
+    if(pid==null||String(pid)===''||Number(pid)<0) return Object.assign({},it,{ fifoLotes:it.fifoLotes||[] });
+    var pidStr=String(pid);
+    var qc=saleLineCajas(it);
+    if(!(qc>STOCK_EPS)) qc=Number(it.qty)||0;
+    var fifo=takeFromQueue(pidStr, qc);
+    var locs=[];
+    fifo.forEach(function(f){ if(locs.indexOf(f.locationCode)<0) locs.push(f.locationCode); });
+    var loc=it.locationCode||'LOCAL';
+    if(fifo.length) loc=locs.length===1?locs[0]:locs.join('+');
+    return Object.assign({},it,{ fifoLotes:fifo, locationCode:loc });
+  });
 }
 /** Tabla de lotes en bodega + columna «Salida» según cantidad a vender/reservar (FIFO). */
 function htmlLotesDesgloseVenta(pId,loc,qtyNeedCajas){
@@ -2905,37 +2997,52 @@ function finalizarVenta(){
 
   const total=subtotal-desc;
   const prods=getProducts();
+  var cartNeedBy={};
   for(var ciIdx=0;ciIdx<cart.length;ciIdx++){
     var ci0=cart[ciIdx];
     var ix=prods.findIndex(p=>p.id===ci0.id);
     if(ix<0){ alert2('Producto no encontrado: '+ci0.name,'error'); return; }
-    var lc=ci0.locationCode||'LOCAL';
-    ensureStockByLoc(prods[ix]);
     var need0=saleLineCajas(ci0);
     if(need0<=STOCK_EPS){ alert2('Cantidad inválida en línea: '+ci0.name,'error'); return; }
-    if(!stockCovers(limajeDisponibleEnBodega(prods[ix],lc),need0)){ alert2('Stock insuficiente en '+LOC_LABELS[lc]+' para '+ci0.name,'error'); return; }
+    cartNeedBy[ci0.id]=(cartNeedBy[ci0.id]||0)+need0;
   }
-  cart.forEach(ci=>{
-    const idx=prods.findIndex(p=>p.id===ci.id);
+  for(var pid in cartNeedBy){
+    var pRef=prods.find(function(p){ return String(p.id)===String(pid); });
+    if(!pRef){ alert2('Producto no encontrado','error'); return; }
+    if(!stockCovers(limajeTotalDisponibleProduct(pRef),cartNeedBy[pid])){
+      alert2('Stock insuficiente (total bodegas) para '+pRef.name,'error'); return;
+    }
+  }
+  var salePlans={};
+  for(var pidSale in cartNeedBy){
+    var gPlan=globalFifoPlanFromLots(pidSale, cartNeedBy[pidSale]);
+    if(gPlan.shortfall>STOCK_EPS){
+      alert2('No hay lotes suficientes para completar la venta. Revise inventario y lotes por bodega.','error'); return;
+    }
+    salePlans[pidSale]=gPlan.plan;
+  }
+  Object.keys(salePlans).forEach(function(pid){
+    deductLotsFromGlobalPlan(pid, salePlans[pid]);
+  });
+  Object.keys(cartNeedBy).forEach(function(pid){
+    var idx=prods.findIndex(function(p){ return String(p.id)===String(pid); });
     if(idx<0) return;
-    const loc=ci.locationCode||'LOCAL';
-    var qc=saleLineCajas(ci);
-    prods[idx].stockByLocation[loc]=(Number(prods[idx].stockByLocation[loc])||0)-qc;
-    recomputeStockTotal(prods[idx]);
-    deductLotsFIFO(ci.id,loc,qc);
+    syncStockFromLots(prods[idx]);
+    clampProductStockNonNegative(prods[idx]);
   });
   DB.set('products',prods);
 
   const mvs=getMovements();
   const movId=nextMovementId();
-  const itemsPayload=cart.map(function(c){
-    var loc=c.locationCode||'LOCAL';
-    var qc=saleLineCajas(c);
-    var fifoRaw=previewLotsFIFOConsumption(c.id,loc,qc);
-    var fifoLotes=fifoRaw.map(function(x){ return { lotCode:x.lotCode, cajas:x.take, ingreso:x.receivedAt }; });
+  var cartLineObjs=cart.map(function(c){
     return { lineId:c.lineId,id:c.id,code:c.code,name:c.name,price:c.price,priceCost:c.priceCost,priceLimit:c.priceLimit,
-      qty:qc, locationCode:loc, qtyMode:c.qtyMode||'cajas', m2:c.m2, piezas:c.piezas,
-      subtotalLinea:saleLineSubtotal(c), fifoLotes:fifoLotes };
+      qty:saleLineCajas(c), locationCode:c.locationCode||'LOCAL', qtyMode:c.qtyMode||'cajas', m2:c.m2, piezas:c.piezas,
+      subtotalLinea:saleLineSubtotal(c) };
+  });
+  const itemsPayload=enrichSaleItemsWithGlobalFifo(cartLineObjs,salePlans).map(function(it){
+    return { lineId:it.lineId,id:it.id,code:it.code,name:it.name,price:it.price,priceCost:it.priceCost,priceLimit:it.priceLimit,
+      qty:it.qty, locationCode:it.locationCode, qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas,
+      subtotalLinea:it.subtotalLinea, fifoLotes:it.fifoLotes||[] };
   });
   const mov={id:movId,type:'venta',ts:nowTs(),date:today(),subtotal,descuento:desc,total,pago,note,nit,numeroFactura,vendedor:currentUser.username,items:itemsPayload};
   mvs.push(mov);DB.set('movements',mvs);
@@ -3031,7 +3138,7 @@ function buildReceiptHTML(mov,mode){
     }
     return `
     <div class="receipt-row">
-      <span style="flex:1;padding-right:4px;">${i.name}${i.code?' ('+i.code+')':''}${i.locationCode&&LOC_LABELS[i.locationCode]?' · '+LOC_LABELS[i.locationCode]:''}${lotStr}</span>
+      <span style="flex:1;padding-right:4px;">${i.name}${i.code?' ('+i.code+')':''}${i.locationCode?' · '+limajeLocLabelDisplay(i.locationCode):''}${lotStr}</span>
       <span style="white-space:nowrap;">${cant} × ${fmt(pu)} = ${fmt(sub)}</span>
     </div>`;
   }).join('');
@@ -3457,7 +3564,7 @@ function renderMovimientos(){
       <td style="font-size:11px;color:var(--text2)">${m.id}</td>
       <td style="font-size:11px">${fmtDt(m.ts)}</td>
       <td><span class="badge ${m.type==='venta'?'badge-green':m.type==='ingreso'?'badge-blue':m.type==='abono'?'badge-teal':'badge-red'}">${m.type==='ingreso'?'otro ingreso':m.type}</span></td>
-      <td style="font-size:11px;max-width:180px;">${m.type==='venta'?(m.items||[]).map(i=>i.name+' x'+ventaItemCantidadEtiqueta(i)+(i.locationCode?' ['+LOC_LABELS[i.locationCode]+']':'')).join(', '):m.note||m.desc||'—'}</td>
+      <td style="font-size:11px;max-width:180px;">${m.type==='venta'?(m.items||[]).map(i=>i.name+' x'+ventaItemCantidadEtiqueta(i)+(i.locationCode?' ['+limajeLocLabelDisplay(i.locationCode)+']':'')).join(', '):m.note||m.desc||'—'}</td>
       <td style="font-size:10px;max-width:100px;">${m.type==='venta'?(m.nit||'—')+'<br><strong>'+(m.numeroFactura||'—')+'</strong>':'—'}</td>
       <td style="font-size:11px">${m.pago||m.categ||'—'}</td>
       <td class="${m.type==='egreso'?'monto-egreso':'monto-ingreso'}">${fmt(m.total)}</td>
@@ -4462,19 +4569,26 @@ async function cotizGuardar(){
       await limajeRefreshStockMap();
       cotizAssignWarehousesFromStock(cotizLineas);
       if(status==='pendiente'){
-        var sinBod=[];
+        var needByPend={};
         cotizLineas.forEach(function(l){
           if(l.sinInventario||!l.productId) return;
           var pr=getProdById(l.productId);
           if(!pr) return;
           var nd=LM.lineCajasInventario(l,getProdById);
           if(nd<=STOCK_EPS) return;
-          if(!pickWarehouseCoveringNeed(pr,nd)) sinBod.push(l.name||l.code||String(l.productId));
+          var k=String(l.productId);
+          needByPend[k]=(needByPend[k]||0)+nd;
         });
-        if(sinBod.length){
+        var sinTot=[];
+        Object.keys(needByPend).forEach(function(pid){
+          var pr=getProdById(parseInt(pid,10)||pid);
+          var need=needByPend[pid];
+          if(!stockCovers(limajeTotalDisponibleProduct(pr),need)) sinTot.push((pr&&pr.name)?pr.name:pid);
+        });
+        if(sinTot.length){
           var pr0=cotizLineas.find(function(x){ return x.productId&&!x.sinInventario; });
           var pHint=pr0?getProdById(pr0.productId):null;
-          alert2('Stock insuficiente (por bodega, ya descontando reservas de otras cotizaciones) en: '+sinBod.join(', ')+'. Use estado «Pendiente abastecimiento» o reduzca cantidades.'+(pHint?'\n'+cotizHintDisponiblePorBodega(pHint):''),'error');
+          alert2('Stock insuficiente (total en Local+B1+B2, restando otras reservas) para: '+sinTot.join(', ')+'. Reduzca cantidades o use «Pendiente abastecimiento».'+(pHint?'\n'+cotizHintDisponiblePorBodega(pHint):''),'error');
           return;
         }
       }
@@ -4500,10 +4614,28 @@ async function cotizGuardar(){
       if(prevSt==='pendiente'&&status!=='pendiente'&&row.sqlId)
         await LM.liberarReservaRpc(row.sqlId);
       if(status==='pendiente'&&row.sqlId){
-        var lines=enriched.filter(function(l){ return l.productId&&!l.sinInventario; }).map(function(l){
-          return { product_id:String(l.productId), location_code:l.locationCode||'LOCAL', cajas:Number(l.cajasInventario)||0 };
+        var needRes={};
+        cotizLineas.forEach(function(l){
+          if(l.sinInventario||!l.productId) return;
+          var nd=LM.lineCajasInventario(l,getProdById);
+          if(nd<=STOCK_EPS) return;
+          var k=String(l.productId);
+          needRes[k]=(needRes[k]||0)+nd;
         });
-        if(lines.length) await LM.reservarRpc(row.sqlId, lines);
+        var resLines=[];
+        Object.keys(needRes).forEach(function(pid){
+          var g=globalFifoPlanFromLots(pid, needRes[pid]);
+          if(g.shortfall>STOCK_EPS) throw new Error('No hay suficientes lotes para reservar producto '+pid+' (revise inventario).');
+          var byLoc={};
+          g.plan.forEach(function(s){
+            var lc=s.locationCode||'LOCAL';
+            byLoc[lc]=(byLoc[lc]||0)+s.take;
+          });
+          Object.keys(byLoc).forEach(function(lc){
+            resLines.push({ product_id:String(pid), location_code:lc, cajas:byLoc[lc] });
+          });
+        });
+        if(resLines.length) await LM.reservarRpc(row.sqlId, resLines);
       }
       if(status==='cancelada'&&prevSt==='pendiente_abastecimiento'&&sb&&row.sqlId){
         try{ await sb.from('limaje_demanda_linea').delete().eq('cotizacion_id',row.sqlId); }catch(eDem){ console.warn(eDem); }
@@ -4547,39 +4679,55 @@ async function cotizGuardar(){
 }
 function aplicarVentaDesdeCotizacion(ventaJson){
   if(!ventaJson||!ventaJson.items) return;
+  var srcItems=ventaJson.items||[];
+  var needBy={};
+  srcItems.forEach(function(it){
+    var pid=it.id;
+    if(pid==null||pid===''||Number(pid)<0) return;
+    var qc=saleLineCajas({ id:pid, qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas, qty:it.qty });
+    if(!(qc>STOCK_EPS)) qc=Number(it.qty)||0;
+    needBy[String(pid)]=(needBy[String(pid)]||0)+qc;
+  });
+  var plans={};
+  var fifoShortCotiz=false;
+  for(var pidFifo in needBy){
+    var gFifo=globalFifoPlanFromLots(pidFifo, needBy[pidFifo]);
+    plans[pidFifo]=gFifo.plan;
+    if(gFifo.shortfall>STOCK_EPS){
+      fifoShortCotiz=true;
+      console.warn('LIMAJE: faltante FIFO al aplicar venta desde cotización',pidFifo,gFifo.shortfall);
+    }
+  }
+  if(fifoShortCotiz)
+    alert2('La venta quedó registrada en el servidor, pero en este equipo no se pudo descontar todo desde lotes locales. Sincronice inventario (nube) para no desalinear stock.','error');
+  Object.keys(plans).forEach(function(pid){
+    deductLotsFromGlobalPlan(pid, plans[pid]);
+  });
+  var prods=getProducts();
+  Object.keys(needBy).forEach(function(pid){
+    var idx=prods.findIndex(function(p){ return String(p.id)===String(pid); });
+    if(idx<0) return;
+    syncStockFromLots(prods[idx]);
+    clampProductStockNonNegative(prods[idx]);
+  });
+  DB.set('products',prods);
+  var lineForFifo=srcItems.map(function(it){
+    return { lineId:it.lineId,id:it.id,code:it.code,name:it.name,price:Number(it.price)||0,priceCost:Number(it.priceCost)||0,priceLimit:Number(it.priceLimit)||0,
+      qty:Number(it.qty)||0,locationCode:it.locationCode||'LOCAL',qtyMode:it.qtyMode,m2:it.m2,piezas:it.piezas,subtotalLinea:it.subtotalLinea };
+  });
+  var enrichedItems=enrichSaleItemsWithGlobalFifo(lineForFifo,plans).map(function(it){
+    return { lineId:it.lineId||Date.now()+Math.random(), id:it.id, code:it.code, name:it.name, price:it.price,
+      priceCost:it.priceCost, priceLimit:it.priceLimit, qty:it.qty, locationCode:it.locationCode, qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas,
+      subtotalLinea:it.subtotalLinea, fifoLotes:it.fifoLotes||[] };
+  });
   var mvs=getMovements();
   mvs.push({
     id:ventaJson.id,type:'venta',ts:ventaJson.ts||nowTs(),date:ventaJson.date||today(),
     subtotal:ventaJson.subtotal,descuento:ventaJson.descuento||0,total:ventaJson.total,
     pago:ventaJson.pago||'Efectivo',note:ventaJson.note||'',nit:ventaJson.nit||'',numeroFactura:ventaJson.numeroFactura||'',
-    vendedor:ventaJson.vendedor||'',
-    items:(ventaJson.items||[]).map(function(it){
-      var loc=it.locationCode||'LOCAL';
-      var qc=saleLineCajas({ id:it.id, qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas, qty:it.qty });
-      if(!(qc>STOCK_EPS)) qc=Number(it.qty)||0;
-      var fifoRaw=previewLotsFIFOConsumption(it.id,loc,qc);
-      var fifoLotes=fifoRaw.map(function(x){ return { lotCode:x.lotCode, cajas:x.take, ingreso:x.receivedAt }; });
-      return { lineId:it.lineId||Date.now()+Math.random(), id:it.id, code:it.code, name:it.name, price:Number(it.price)||0,
-        priceCost:Number(it.priceCost)||0, priceLimit:Number(it.priceLimit)||0, qty:qc, locationCode:loc,
-        qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas, subtotalLinea:it.subtotalLinea, fifoLotes:fifoLotes };
-    })
+    vendedor:ventaJson.vendedor||'', items:enrichedItems
   });
   DB.set('movements',mvs);
-  var prods=getProducts();
-  (ventaJson.items||[]).forEach(function(it){
-    var pid=it.id;
-    if(pid==null||pid===''||Number(pid)<0) return;
-    var idx=prods.findIndex(function(p){ return p.id===pid; });
-    if(idx<0) return;
-    var loc=it.locationCode||'LOCAL';
-    var q=saleLineCajas({ id:pid, qtyMode:it.qtyMode, m2:it.m2, piezas:it.piezas, qty:it.qty });
-    if(!(q>STOCK_EPS)) q=Number(it.qty)||0;
-    ensureStockByLoc(prods[idx]);
-    prods[idx].stockByLocation[loc]=Math.max(0,(Number(prods[idx].stockByLocation[loc])||0)-q);
-    recomputeStockTotal(prods[idx]);
-    deductLotsFIFO(pid,loc,q);
-  });
-  DB.set('products',prods);
   logAudit('venta_cotiz','Venta #'+ventaJson.id+' desde cotización','ventas',ventaJson.id);
 }
 async function cotizConfirmarDesdeLista(id){
@@ -4614,6 +4762,9 @@ async function cotizConfirmarDesdeLista(id){
     DB.set('cotizaciones',list3);
     await limajeRefreshStockMap();
     await flushPersistQueue();
+    var vidRec=(r.venta&&r.venta.id!=null)?r.venta.id:r.venta_id;
+    var movRecibo=getMovements().find(function(m){ return String(m.id)===String(vidRec); });
+    if(movRecibo) showReceipt(movRecibo);
     alert2('Convertida · Venta #'+r.venta_id,'success');
     renderCotizacionesList();
   }catch(e){
@@ -4625,7 +4776,7 @@ async function cotizConfirmarDesdeLista(id){
   }
 }
 function cotizPromptConfirmar(id){
-  if(!confirm('¿Confirmar esta cotización? Se generará la venta y se descontará inventario si hay stock.')) return;
+  if(!confirm('¿Confirmar esta cotización? Se generará la venta, se descontará inventario (por bodega/lote según FIFO) y se abrirá el recibo para compartir o imprimir.')) return;
   void cotizConfirmarDesdeLista(id);
 }
 function pdfDateParts(){
@@ -4921,7 +5072,7 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   (mov.items||[]).forEach(function(it,idx){
     var line=ventaItemSubtotalStored(it);
     var cantStr=ventaItemCantidadEtiqueta(it);
-    var txt=(it.name||'')+(it.code?' ('+it.code+')':'')+(it.locationCode&&LOC_LABELS[it.locationCode]?' · '+LOC_LABELS[it.locationCode]:'');
+    var txt=(it.name||'')+(it.code?' ('+it.code+')':'')+(it.locationCode?' · '+limajeLocLabelDisplay(it.locationCode):'');
     if(it.fifoLotes&&it.fifoLotes.length){
       txt+=' · Lote(s): '+it.fifoLotes.map(function(f){
         var ing=f.ingreso?(' ing.'+new Date(f.ingreso).toLocaleDateString('es-GT')):'';

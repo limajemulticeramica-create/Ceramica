@@ -4,3 +4,5 @@ Thumbs.db
 *.log
 .env
 .env.*
+# Supabase URL + anon key (mantener solo en deploy / copia local; usar limaje-config.example.js en el repo)
+limaje-config.js
