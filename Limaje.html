@@ -2298,8 +2298,20 @@ async function limajeResetSistemaConfigurador(){
   try{
     var LM=window.__limajeSqlCore;
     if(LM&&window.__limajeSupabase){
-      var out=await LM.purgeAllCotizacionesConfiguradorRpc();
-      if(out&&out.ok===false) console.warn('purge cotizaciones',out.error||out);
+      var sb=window.__limajeSupabase;
+      var purged=false;
+      try{
+        var out=await LM.purgeAllCotizacionesConfiguradorRpc();
+        if(out&&out.ok===false){ console.warn('purge cotizaciones rpc',out.error||out); }
+        else purged=true;
+      }catch(eRpc){
+        console.warn('purge cotizaciones rpc fail',eRpc);
+      }
+      // Fallback: borrar directo (si el RPC no existe / no borró)
+      if(!purged){
+        try{ await sb.from('limaje_demanda_linea').delete().neq('id',0); }catch(eDemAll){ console.warn(eDemAll); }
+        try{ await sb.from('limaje_cotizaciones').delete().neq('id',0); purged=true; }catch(eDel){ console.warn(eDel); }
+      }
     }
   }catch(e){ /* si falla, igual continuamos con el reset local */ }
 
@@ -2325,10 +2337,17 @@ async function limajeResetSistemaConfigurador(){
   DB.set('compras',[]);
   DB.set('gastosOperativosMes',{});
   DB.set('app_prefs',DB.get('app_prefs',{}));
+  // Reset UI state de cotizaciones / historial paginado
+  try{ cotHistOffset=0; }catch(e0){}
+  try{ cotizEditId=null; cotizLineas=[]; }catch(e1){}
 
   try{ await persistFullLimajeState(); }catch(e2){}
   try{ await limajeRefreshStockMap(); }catch(e3){}
-  try{ renderDashboard(); renderProducts(); renderInventario(); renderCaja(); renderMovimientos(); renderCartera(); renderDocumentosPage(); renderAuditoria(); renderTrabajadores(); renderCotizacionesList(); }catch(e4){}
+  try{
+    // recargar también desde SQL (para que el historial nube quede vacío en pantalla)
+    try{ await limajeRefreshCotizacionesFromSql(); }catch(xSql){}
+    renderDashboard(); renderProducts(); renderInventario(); renderCaja(); renderMovimientos(); renderCartera(); renderDocumentosPage(); renderAuditoria(); renderTrabajadores(); renderCotizacionesList();
+  }catch(e4){}
   alert2('Sistema reseteado ✅','success');
   logAudit('reset_sistema','Reset completo por configurador','sistema',String(Date.now()));
 }
@@ -3423,7 +3442,7 @@ function buildReceiptHTML(mov,mode){
     ${mov.pago==='credito'?`<div style="text-align:center;background:#fff3cd;border:1px solid #e09832;border-radius:3px;padding:4px;font-size:${isA4?'9pt':'8pt'};margin:4px 0;font-weight:700;color:#856404;">⚠ VENTA A CRÉDITO — PENDIENTE DE PAGO</div>`:''}
     <hr style="border:1px dashed #999;margin:6px 0;">
     <div style="text-align:center;font-size:${isA4?'10pt':'8.5pt'};margin-top:4px;">¡Gracias por su compra!</div>
-    <div style="text-align:center;font-size:${isA4?'8.5pt':'7pt'};color:#2e7d32;margin-top:4px;line-height:1.35;">limajemulticeramica@gmail.com<br>Tel. 5453-3143</div>
+    <div style="text-align:center;font-size:${isA4?'8.5pt':'7pt'};color:#2e7d32;margin-top:4px;line-height:1.35;">multiceramicasanjuan@gmail.com<br>Tel. 5453-3143</div>
     ${isA4?`<div style="text-align:center;font-size:8pt;color:#999;margin-top:10px;">Generado: ${ds} · ${mov.vendedor||''}</div>`:''}
   </div>`;
 }
@@ -5038,7 +5057,7 @@ function pdfSuggestedFilename(tipo, refId){
   return 'SAN_JUAN_'+p.ym+'_'+slug+'_'+refId+'.pdf';
 }
 var PDF_EMPRESA_NOMBRE=LIMAJE_BRAND_COMPANY_NAME;
-var PDF_EMPRESA_EMAIL='limajemulticeramica@gmail.com';
+var PDF_EMPRESA_EMAIL='multiceramicasanjuan@gmail.com';
 var PDF_EMPRESA_TEL='5453-3143';
 var PDF_BRAND_G=[46,125,50], PDF_BRAND_R=[198,40,40], PDF_BRAND_B=[21,101,192];
 var _pdfLogoBadgeCache=null;
@@ -5123,46 +5142,56 @@ function pdfRegistrarDocumento(tipo, titulo, nombreArchivo, refId, extra){
 }
 function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   var M=14, W=182, y=11;
-  var headerH=40;
+  var headerH=44;
   pdfBrandStripe(doc,M,y,headerH);
-  doc.setFillColor(250,252,250);
+  doc.setFillColor(248,251,249);
   doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.setLineWidth(0.4);
   doc.rect(M+5,y,W-5,headerH,'FD');
-  pdfDrawLogo(doc,logoDataUrl,M+9,y+6,78,28);
+  pdfDrawLogo(doc,logoDataUrl,M+10,y+7,78,28);
   var tx=M+W-7;
   doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.setFont('helvetica','bold');
-  doc.setFontSize(18);
-  doc.text('COTIZACIÓN',tx,y+13,{align:'right'});
+  doc.setFontSize(17);
+  doc.text('COTIZACIÓN',tx,y+12.5,{align:'right'});
   doc.setFont('helvetica','normal');
-  doc.setFontSize(8.2);
+  doc.setFontSize(8.4);
   doc.setTextColor(40,40,42);
-  doc.text(PDF_EMPRESA_NOMBRE,tx,y+20,{align:'right'});
+  doc.text(PDF_EMPRESA_NOMBRE,tx,y+20.5,{align:'right'});
   doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
-  doc.text(PDF_EMPRESA_EMAIL,tx,y+26,{align:'right'});
+  doc.text(PDF_EMPRESA_EMAIL,tx,y+27,{align:'right'});
   doc.setTextColor(55,65,60);
-  doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+32,{align:'right'});
+  doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+33,{align:'right'});
   doc.setFontSize(7);
   doc.setTextColor(100,110,105);
-  doc.text('Cotización comercial · No constituye factura fiscal (FEL)',tx,y+37,{align:'right'});
-  y+=headerH+8;
+  doc.text('Cotización comercial · No constituye factura fiscal (FEL)',tx,y+40,{align:'right'});
+  y+=headerH+7;
+
+  // Badge de referencia (moderno y visible)
+  doc.setFillColor(238,246,255);
+  doc.setDrawColor(178,205,236);
+  doc.roundedRect(M+W-62,y-1,62,10,2,2,'FD');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.text('Ref. #'+q.id,M+W-4,y+5,{align:'right'});
+
   doc.setTextColor(30,30,30);
   doc.setFontSize(10);
   doc.setFont('helvetica','bold');
-  doc.text('No. '+q.id+'  ·  '+dateLabel(q.date||today())+'  ·  '+cotizEstadoLabel(q.status),M,y);
+  doc.text(dateLabel(q.date||today())+'  ·  Estado: '+cotizEstadoLabel(q.status),M,y+4);
   y+=6;
   doc.setFont('helvetica','normal');
   doc.setFontSize(8.5);
   doc.setTextColor(60,65,62);
-  doc.text('Elaborado por: '+cotizElaboradoText(q),M,y);
-  y+=7;
+  doc.text('Elaborado por: '+cotizElaboradoText(q),M,y+3);
+  y+=8;
   doc.setFillColor(255,255,255);
   doc.setDrawColor(PDF_BRAND_G[0],PDF_BRAND_G[1],PDF_BRAND_G[2]);
   doc.setLineWidth(0.35);
-  doc.rect(M,y,W,24,'S');
+  doc.roundedRect(M,y,W,24,2,2,'S');
   doc.setFillColor(232,245,233);
-  doc.rect(M,y,W,6,'F');
+  doc.roundedRect(M,y,W,6,2,2,'F');
   doc.setTextColor(PDF_BRAND_G[0],PDF_BRAND_G[1],PDF_BRAND_G[2]);
   doc.setFont('helvetica','bold');
   doc.setFontSize(9);
@@ -5184,9 +5213,9 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   }
   doc.setTextColor(0,0,0);
   doc.setFontSize(9);
-  doc.setFillColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setFillColor(33,90,153);
   doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
-  doc.rect(M,y,W,8,'F');
+  doc.roundedRect(M,y,W,8,1.5,1.5,'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold');
   doc.text('Descripción',M+3,y+5.5);
@@ -5225,12 +5254,12 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.line(M,y,M+W,y); y+=7;
   var sub=q.subtotal!=null?q.subtotal:cotizSubtotal();
   var tot=q.total!=null?q.total:Math.max(0,cotizSubtotal()-(q.descuento||0));
-  var boxL=M+98;
+  var boxL=M+95;
   doc.setFillColor(248,252,249);
-  doc.setDrawColor(190,210,195);
+  doc.setDrawColor(178,208,188);
   doc.setLineWidth(0.35);
   var boxH=6+6+((q.descuento||0)>0?6:0)+10;
-  doc.rect(boxL,y-3,M+W-boxL-2,boxH,'FD');
+  doc.roundedRect(boxL,y-3,M+W-boxL-2,boxH,2,2,'FD');
   doc.setFont('helvetica','normal');
   doc.setFontSize(9.5);
   doc.setTextColor(55,55,55);
@@ -5265,7 +5294,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
       y+=ih+6;
     }catch(e){ doc.text('(Imagen no incluida)',M,y); y+=6; }
   }
-  doc.setFontSize(7);
+  doc.setFontSize(7.2);
   doc.setTextColor(95,100,98);
   var foot1=PDF_EMPRESA_NOMBRE+'  ·  '+PDF_EMPRESA_EMAIL+'  ·  Tel. '+PDF_EMPRESA_TEL;
   doc.text(foot1,M+W/2,283,{align:'center'});
@@ -5274,42 +5303,49 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
 }
 function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   var M=14, W=182, y=11;
-  var headerH=40;
+  var headerH=44;
   pdfBrandStripe(doc,M,y,headerH);
-  doc.setFillColor(250,252,250);
+  doc.setFillColor(248,251,249);
   doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.setLineWidth(0.4);
   doc.rect(M+5,y,W-5,headerH,'FD');
-  pdfDrawLogo(doc,logoDataUrl,M+9,y+6,78,28);
+  pdfDrawLogo(doc,logoDataUrl,M+10,y+7,78,28);
   var tx=M+W-7;
   doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.setFont('helvetica','bold');
-  doc.setFontSize(14);
-  doc.text('COMPROBANTE DE VENTA',tx,y+13,{align:'right'});
+  doc.setFontSize(15);
+  doc.text('COMPROBANTE DE VENTA',tx,y+12.5,{align:'right'});
   doc.setFont('helvetica','normal');
-  doc.setFontSize(8.2);
+  doc.setFontSize(8.4);
   doc.setTextColor(40,40,42);
-  doc.text(PDF_EMPRESA_NOMBRE,tx,y+21,{align:'right'});
+  doc.text(PDF_EMPRESA_NOMBRE,tx,y+20.5,{align:'right'});
   doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.text(PDF_EMPRESA_EMAIL,tx,y+27,{align:'right'});
   doc.setTextColor(55,65,60);
   doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+33,{align:'right'});
-  y+=headerH+8;
+  y+=headerH+7;
   var ds=new Date(mov.ts).toLocaleString('es-GT');
+  doc.setFillColor(238,246,255);
+  doc.setDrawColor(178,205,236);
+  doc.roundedRect(M+W-62,y-1,62,10,2,2,'FD');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.text('Venta #'+mov.id,M+W-4,y+5,{align:'right'});
   doc.setTextColor(40,40,40);
   doc.setFontSize(10);
-  doc.text('No. venta: '+mov.id+'  ·  '+ds,M,y); y+=8;
-  doc.text('Vendedor: '+(mov.vendedor||'—')+'  ·  Pago: '+(mov.pago==='credito'?'CRÉDITO':(mov.pago||'—')),M,y); y+=8;
+  doc.text(ds,M,y+4); y+=8;
+  doc.text('Vendedor: '+(mov.vendedor||'—')+'  ·  Pago: '+(mov.pago==='credito'?'CRÉDITO':(mov.pago||'—')),M,y+3); y+=8;
   doc.setFont('helvetica','bold');
-  doc.text('Cliente: ',M,y);
+  doc.text('Cliente: ',M,y+2);
   doc.setFont('helvetica','normal');
-  doc.text(String(mov.note||'Consumidor final'),M+22,y); y+=7;
-  if(mov.nit){ doc.text('NIT: '+mov.nit,M,y); y+=6; }
-  if(mov.numeroFactura){ doc.text('No. factura / FEL: '+mov.numeroFactura,M,y); y+=6; }
+  doc.text(String(mov.note||'Consumidor final'),M+22,y+2); y+=7;
+  if(mov.nit){ doc.text('NIT: '+mov.nit,M,y+1); y+=6; }
+  if(mov.numeroFactura){ doc.text('No. factura / FEL: '+mov.numeroFactura,M,y+1); y+=6; }
   y+=4;
-  doc.setFillColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setFillColor(33,90,153);
   doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
-  doc.rect(M,y,W,8,'F');
+  doc.roundedRect(M,y,W,8,1.5,1.5,'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold');
   doc.text('Producto',M+3,y+5.5);
@@ -5343,21 +5379,27 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   y+=6;
   doc.line(M,y,M+W,y); y+=7;
   var sub=(mov.items||[]).reduce(function(s,i){ return s+ventaItemSubtotalStored(i); },0);
-  doc.text('Subtotal',M+120,y);
-  doc.text('Q '+sub.toFixed(2),M+W-2,y,{align:'right'});
+  var boxL=M+98;
+  doc.setFillColor(248,252,249);
+  doc.setDrawColor(178,208,188);
+  doc.setLineWidth(0.35);
+  var boxH=6+6+((mov.descuento||0)>0?6:0)+10;
+  doc.roundedRect(boxL,y-3,M+W-boxL-2,boxH,2,2,'FD');
+  doc.text('Subtotal',boxL+4,y+3);
+  doc.text('Q '+sub.toFixed(2),M+W-4,y+3,{align:'right'});
   y+=6;
   if((mov.descuento||0)>0){
     doc.setTextColor(180,60,60);
-    doc.text('Descuento',M+120,y);
-    doc.text('- Q '+Number(mov.descuento).toFixed(2),M+W-2,y,{align:'right'});
+    doc.text('Descuento',boxL+4,y+3);
+    doc.text('- Q '+Number(mov.descuento).toFixed(2),M+W-4,y+3,{align:'right'});
     doc.setTextColor(0,0,0);
     y+=6;
   }
   doc.setFont('helvetica','bold');
   doc.setFontSize(12);
   doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
-  doc.text('TOTAL',M+120,y);
-  doc.text('Q '+Number(mov.total||0).toFixed(2),M+W-2,y,{align:'right'});
+  doc.text('TOTAL',boxL+4,y+4);
+  doc.text('Q '+Number(mov.total||0).toFixed(2),M+W-4,y+4,{align:'right'});
   y+=10;
   doc.setFontSize(7);
   doc.setTextColor(95,100,98);
