@@ -3,21 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Sistema de ventas, inventario, cartera y caja Multi-cerámica LIMAJE. Sincronización en la nube entre dispositivos.">
+<meta name="description" content="Sistema de ventas, inventario, cartera y caja Multi-Cerámica San Juan. Sincronización en la nube entre dispositivos.">
 <meta name="theme-color" content="#1b5e20">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="LIMAJE">
+<meta name="apple-mobile-web-app-title" content="San Juan">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>Multi-cerámica LIMAJE — Sistema de Gestión v2.0</title>
+<link rel="icon" type="image/png" sizes="512x512" href="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png">
+<link rel="apple-touch-icon" href="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png">
+<title>Multi-Cerámica San Juan — Sistema de Gestión v2.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
   :root {
-    /* Branding Multi-cerámica LIMAJE: verde, rojo, azul */
+    /* Branding Multi-Cerámica San Juan: verde, rojo, azul */
     --brand-green:#2e7d32; --brand-green-dk:#1b5e20; --brand-green-lt:#7dc990; --brand-green-xs:#e8f5e9;
     --brand-red:#c62828; --brand-red-lt:#ffcdd2;
     --brand-blue:#1565c0; --brand-blue-lt:#bbdefb;
@@ -311,11 +310,11 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <!-- INTRODUCCIÓN / BIENVENIDA -->
 <div id="introScreen">
   <div class="intro-box">
-    <img src="logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('introLogoFallback');if(t)t.style.display='block';">
-    <div id="introLogoFallback" style="display:none;font-size:22px;font-weight:700;color:#fff;text-align:center;padding:16px;">Multi-cerámica LIMAJE</div>
+    <img src="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png" alt="Multi-Cerámica San Juan" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('introLogoFallback');if(t)t.style.display='block';">
+    <div id="introLogoFallback" style="display:none;font-size:22px;font-weight:700;color:#fff;text-align:center;padding:16px;">Multi-Cerámica San Juan</div>
     <div class="login-brand-sub">Sistema de Gestión</div>
     <div class="intro-title">Bienvenido</div>
-    <div class="intro-text">Sistema de ventas, inventario, cartera y caja para Multi-cerámica LIMAJE. Registre ventas, controle stock, imprima recibos en ticket 57mm y gestione créditos.</div>
+    <div class="intro-text">Sistema de ventas, inventario, cartera y caja para Multi-Cerámica San Juan. Registre ventas, controle stock, imprima recibos en ticket 57mm y gestione créditos.</div>
     <div class="intro-actions">
       <button type="button" class="btn btn-full" id="btnIntroContinue">Continuar</button>
     </div>
@@ -327,8 +326,8 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">
-      <img src="logo.png" alt="Multi-cerámica LIMAJE" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('loginLogoFallback');if(t)t.style.display='block';">
-      <div id="loginLogoFallback" style="display:none;font-size:20px;font-weight:700;color:var(--teal-dk);text-align:center;padding:12px;">Multi-cerámica LIMAJE</div>
+      <img src="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png" alt="Multi-Cerámica San Juan" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('loginLogoFallback');if(t)t.style.display='block';">
+      <div id="loginLogoFallback" style="display:none;font-size:20px;font-weight:700;color:var(--teal-dk);text-align:center;padding:12px;">Multi-Cerámica San Juan</div>
       <div class="login-brand-sub">Sistema de Gestión</div>
     </div>
     <div id="loginAlert"></div>
@@ -346,10 +345,10 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
   <div class="topbar">
     <div class="topbar-brand">
       <div class="topbar-logo">
-        <img src="logo.png" alt="Multi-cerámica LIMAJE" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
+        <img src="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png" alt="Multi-Cerámica San Juan" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
       </div>
       <div class="topbar-name">
-        <span class="topbar-name-script">Multi-cerámica LIMAJE</span>
+        <span class="topbar-name-script">Multi-Cerámica San Juan</span>
         <span class="topbar-name-sub">Sistema de Gestión</span>
       </div>
     </div>
@@ -599,6 +598,123 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
       </div>
     </div>
 
+    <!-- COMPRAS -->
+    <div class="page" id="page-compras">
+      <div class="page-header">
+        <h2>🧾 Compras y costeo</h2>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📌 Gastos operativos del mes</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">
+          Estos gastos se prorratean por día para calcular el <strong>costo real</strong> de compras según el tipo:
+          <strong>Inventario</strong> (días restantes del mes), <strong>Pend. abastecimiento</strong> (1 día), u <strong>Otros</strong> (días configurables).
+        </p>
+        <div class="grid-3" style="gap:10px;align-items:flex-end;">
+          <div class="form-group" style="margin:0;"><label>Mes (YYYY-MM)</label><input type="month" id="opMes"></div>
+          <div class="form-group" style="margin:0;"><label>Días del mes</label><input type="number" id="opDiasMes" min="28" max="31" step="1"></div>
+          <div class="form-group" style="margin:0;"><label>Total gastos (Q)</label><input type="number" id="opTotal" min="0" step="0.01"></div>
+        </div>
+        <div class="grid-3" style="gap:10px;margin-top:10px;">
+          <div class="form-group" style="margin:0;"><label>Internet</label><input type="number" id="opInternet" min="0" step="0.01"></div>
+          <div class="form-group" style="margin:0;"><label>Alquiler</label><input type="number" id="opAlquiler" min="0" step="0.01"></div>
+          <div class="form-group" style="margin:0;"><label>Luz</label><input type="number" id="opLuz" min="0" step="0.01"></div>
+          <div class="form-group" style="margin:0;"><label>Teléfono</label><input type="number" id="opTelefono" min="0" step="0.01"></div>
+          <div class="form-group" style="margin:0;"><label>Agua</label><input type="number" id="opAgua" min="0" step="0.01"></div>
+          <div class="form-group" style="margin:0;"><label>Salarios</label><input type="number" id="opSalarios" min="0" step="0.01"></div>
+        </div>
+        <div id="opResumen" style="margin-top:12px;font-size:13px;"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+          <button type="button" class="btn btn-success" onclick="comprasGuardarGastosOperativos()">Guardar gastos del mes</button>
+          <button type="button" class="btn btn-secondary" onclick="comprasCargarGastosOperativos(true)">Recargar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📦 Registrar compra / ingreso de mercadería</div>
+        <div class="grid-3" style="gap:10px;align-items:flex-end;">
+          <div class="form-group" style="margin:0;"><label>Fecha</label><input type="date" id="compFecha"></div>
+          <div class="form-group" style="margin:0;"><label>Tipo</label>
+            <select id="compTipo" onchange="comprasOnTipoChange()">
+              <option value="inventario">Abastecer inventario (días restantes del mes)</option>
+              <option value="pendiente_abastecimiento">Pendiente de abastecimiento (1 día)</option>
+              <option value="otros">Otros (días configurables)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;"><label>Días a incluir (solo «Otros»)</label><input type="number" id="compDiasOtros" min="0" step="1" value="0" disabled></div>
+        </div>
+
+        <div class="grid-3" style="gap:10px;align-items:flex-end;margin-top:10px;">
+          <div class="form-group" style="margin:0;"><label>Proveedor / nota</label><input type="text" id="compProveedor" placeholder="Opcional"></div>
+          <div class="form-group" style="margin:0;"><label>No. factura / documento</label><input type="text" id="compFactura" placeholder="Opcional"></div>
+          <div class="form-group" style="margin:0;"><label>Bodega</label>
+            <select id="compBodega">
+              <option value="LOCAL">Local</option>
+              <option value="BOD1">Bodega 1</option>
+              <option value="BOD2">Bodega 2</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;background:var(--teal-xs);border-color:var(--border);">
+          <div class="card-title" style="margin-bottom:10px;">➕ Adicionales (carga / despacho / traslado)</div>
+          <p style="font-size:12px;color:var(--text2);margin:0 0 10px 0;">Puede agregarlos por <strong>caja</strong>, por <strong>m²</strong>, por <strong>pieza</strong> o como monto <strong>fijo</strong>. El sistema los distribuye entre las líneas.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group" style="margin:0;min-width:200px;flex:2;"><label>Concepto</label><input id="compExtraDesc" placeholder="Ej. Flete"></div>
+            <div class="form-group" style="margin:0;min-width:140px;flex:1;"><label>Tipo</label>
+              <select id="compExtraTipo">
+                <option value="fijo">Fijo (Q)</option>
+                <option value="caja">Por caja (Q/caja)</option>
+                <option value="m2">Por m² (Q/m²)</option>
+                <option value="pieza">Por pieza (Q/pz)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;min-width:120px;flex:1;"><label>Valor</label><input id="compExtraValor" type="number" min="0" step="0.01" value="0"></div>
+            <button type="button" class="btn btn-sm btn-success" onclick="comprasExtraAdd()">Añadir</button>
+          </div>
+          <div id="compExtrasList" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-title" style="margin-bottom:10px;">🧱 Líneas de compra</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group" style="margin:0;min-width:220px;flex:2;"><label>Producto (buscar)</label><input id="compBuscarProd" placeholder="Código o nombre..." autocomplete="off" oninput="comprasBuscarProductos()"></div>
+            <div class="form-group" style="margin:0;min-width:150px;flex:1;"><label>Modo</label>
+              <select id="compLineaModo"><option value="cajas">Cajas</option><option value="m2">m²</option><option value="piezas">Piezas</option><option value="unidad">Unidad/Bolsa</option></select>
+            </div>
+            <div class="form-group" style="margin:0;min-width:110px;flex:1;"><label>Cant.</label><input id="compLineaQty" type="number" min="0" step="0.01" value="1"></div>
+            <div class="form-group" style="margin:0;min-width:140px;flex:1;"><label>Precio compra unit. (Q)</label><input id="compLineaCosto" type="number" min="0" step="0.01" value="0"></div>
+            <button type="button" class="btn btn-sm btn-success" onclick="comprasLineaAddManual()">Añadir línea</button>
+          </div>
+          <div id="compBuscarResults" style="max-height:180px;overflow-y:auto;margin-top:8px;border:1px solid var(--border);border-radius:8px;display:none;"></div>
+          <div class="table-wrap" id="compLineasTable" style="margin-top:10px;"></div>
+        </div>
+
+        <div id="compTotales" style="margin-top:12px;font-size:13px;"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="compActualizarCosto" checked>
+            <span>Actualizar costo del producto (promedio ponderado)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="compRegistrarEgreso" checked>
+            <span>Registrar egreso (Compra de mercadería)</span>
+          </label>
+          <button type="button" class="btn btn-success" onclick="comprasGuardarCompra()">💾 Guardar compra e ingresar stock</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📚 Historial de compras</div>
+        <div class="search-bar" style="margin-bottom:10px;">
+          <input type="date" id="comprasFrom" onchange="renderComprasPage()">
+          <input type="date" id="comprasTo" onchange="renderComprasPage()">
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('comprasFrom').value='';document.getElementById('comprasTo').value='';renderComprasPage();">Ver todo</button>
+        </div>
+        <div class="table-wrap" id="comprasHistTable"></div>
+      </div>
+    </div>
+
     <!-- CARTERA -->
     <div class="page" id="page-cartera">
       <div class="page-header">
@@ -736,7 +852,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
     <div class="page" id="page-documentos">
       <div class="page-header"><h2>📁 Documentos PDF generados</h2></div>
       <div class="card">
-        <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">Registro de <strong>cotizaciones</strong> y <strong>recibos</strong> exportados como PDF. El nombre de archivo sugiere organización <code>Año-Mes</code> (ej. <strong>LIMAJE_2026-04_Cotizacion_…</strong>) para que pueda crear carpetas en su equipo: <strong>LIMAJE → Año → Mes</strong>.</p>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">Registro de <strong>cotizaciones</strong> y <strong>recibos</strong> exportados como PDF. El nombre de archivo sugiere organización <code>Año-Mes</code> (ej. <strong>SAN_JUAN_2026-04_Cotizacion_…</strong>) para que pueda crear carpetas en su equipo: <strong>San Juan → Año → Mes</strong>.</p>
         <div class="search-bar" style="margin-bottom:14px;">
           <div class="form-group" style="margin:0;"><label>Año</label><select id="docYearFilter" onchange="renderDocumentosPage()"></select></div>
           <div class="form-group" style="margin:0;"><label>Mes</label><select id="docMonthFilter" onchange="renderDocumentosPage()">
@@ -891,17 +1007,12 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
         <button type="button" class="btn btn-success" onclick="guardarPrefsBloqueo()">Guardar preferencias</button>
       </div>
       <div class="card" id="limajeWipeTestDataCard" style="display:none;border-color:#e5989b;background:#fff5f5;">
-        <div class="card-title">🧹 Limpieza de datos de prueba</div>
-        <p style="font-size:13px;color:var(--text2);"><strong>Solo administrador / súper admin (configurador).</strong> Borra registros locales sincronizados (movimientos, cartera, PDFs registrados, etc.). <strong>No elimina</strong> productos ni categorías. Marque solo lo que desea vaciar. Antes exporte un respaldo JSON si duda.</p>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeMovements"> Movimientos (ventas, egresos, ingresos, abonos)</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeCartera"> Cartera (créditos y cuentas por cobrar)</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeCajaCierres"> Cierres de caja</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeDocPdf"> Registro de PDF exportados (historial en app)</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeAudit"> Auditoría local</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeWorkerPay"> Pagos a trabajadores (lista de pagos)</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:10px 0;cursor:pointer;font-size:13px;color:#c0392b;"><input type="checkbox" id="wipeLots"> <strong>Lotes</strong> (existencias por lote; el catálogo puede quedar desalineado hasta ajustar stock o volver a cargar lotes)</label>
-        <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:13px;"><input type="checkbox" id="wipeCotizLocal"> Cotizaciones <strong>solo en este equipo</strong> (no borra Supabase; tras recargar datos pueden volver a aparecer — use en Cotizaciones «Vaciar cotizaciones (nube)» si es configurador)</label>
-        <button type="button" class="btn btn-danger" style="margin-top:12px;" onclick="void limajeEjecutarLimpiezaPruebas()">Eliminar datos marcados</button>
+        <div class="card-title">🧨 Reset del sistema (solo súper admin)</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">
+          Esta acción <strong>reinicia</strong> el sistema en este equipo (catálogo, inventario/lotes, movimientos, cartera, compras, PDFs registrados, auditoría, trabajadores, etc.)
+          y además <strong>vacía cotizaciones en la nube</strong> (si hay conexión y su rol es <strong>configurador</strong>).
+        </p>
+        <button type="button" class="btn btn-danger" onclick="void limajeResetSistemaConfigurador()">🧹 Reset completo</button>
       </div>
     </div>
 
@@ -961,12 +1072,12 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 var _kvCache=Object.create(null);
 var _persistTimer=null;
 var _dirtyKeys=new Set();
-var LIMaje_PERSIST_KEYS=['categories','products','movements','cartera','cajaCierres','locations','inventoryLots','cotizaciones','documentosExportados','auditLog','workers','workerPayments','schemaVersion','app_prefs'];
+var LIMaje_PERSIST_KEYS=['categories','products','movements','cartera','cajaCierres','locations','inventoryLots','cotizaciones','documentosExportados','auditLog','workers','workerPayments','schemaVersion','app_prefs','compras','gastosOperativosMes'];
 function getKvWritableKeysForRole(role){
   if(role==='admin'||role==='contador'||role==='configurador') return LIMaje_PERSIST_KEYS.slice();
   if(role==='vendedor') return ['movements','cartera','products','inventoryLots','locations','cotizaciones','documentosExportados','auditLog','app_prefs'];
-  if(role==='bodeguero') return ['products','inventoryLots','locations','movements','auditLog','app_prefs'];
-  if(role==='auxiliar_bodega') return ['products','inventoryLots','locations','auditLog','app_prefs'];
+  if(role==='bodeguero') return ['products','inventoryLots','locations','movements','auditLog','app_prefs','compras','gastosOperativosMes'];
+  if(role==='auxiliar_bodega') return ['products','inventoryLots','locations','auditLog','app_prefs','compras','gastosOperativosMes'];
   return [];
 }
 function filterPersistKeys(keys){
@@ -984,6 +1095,13 @@ function limajeSupabaseConfigured(){
 }
 /** Recurso estático junto a Limaje.html (válido en raíz o subcarpeta). */
 function limajeAssetUrl(rel){ try{ return new URL(rel||'',location.href).href; }catch(e){ return rel||''; } }
+
+// ============================================================
+// BRANDING (logo, nombre, favicon)
+// ============================================================
+const LIMAJE_BRAND_COMPANY_NAME='Multi-Cerámica San Juan';
+const LIMAJE_BRAND_LOGO_REL='assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png';
+const LIMAJE_BRAND_FAVICON_REL='assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png';
 
 const DB={
   get(k,def=null){
@@ -1667,7 +1785,7 @@ const isAdmin=()=>currentUser&&(currentUser.role==='admin'||currentUser.role==='
 const NAV_ADMIN=[
   {id:'dashboard',label:'📊 Dashboard'},{id:'categorias',label:'🗂 Categorías'},
   {id:'ventas',label:'💰 Ventas'},{id:'cotizaciones',label:'📋 Cotizaciones'},{id:'cotiz-historial',label:'📊 Hist. cotiz.'},
-  {id:'inventario',label:'📦 Inventario'},
+  {id:'inventario',label:'📦 Inventario'},{id:'compras',label:'🧾 Compras'},
   {id:'cartera',label:'💳 Cartera'},{id:'caja',label:'🏦 Caja'},
   {id:'movimientos',label:'↔ Movimientos'},{id:'reportes',label:'📄 Reportes'},{id:'documentos',label:'📁 Documentos'},
   {id:'trabajadores',label:'👷 Trabajadores'},{id:'auditoria',label:'📋 Auditoría'},{id:'actividad-sql',label:'🔐 Act. servidor'},
@@ -1685,11 +1803,13 @@ const NAV_VENDEDOR=[
 ];
 const NAV_BODEGUERO=[
   {id:'dashboard',label:'📊 Dashboard'},
+  {id:'compras',label:'🧾 Compras'},
   {id:'inventario',label:'📦 Inventario'},
   {id:'movimientos',label:'↔ Movimientos'},
 ];
 const NAV_AUX_BOD=[
   {id:'dashboard',label:'📊 Dashboard'},
+  {id:'compras',label:'🧾 Compras'},
   {id:'inventario',label:'📦 Inventario'},
 ];
 function getNavForUser(){
@@ -1743,6 +1863,7 @@ function navigateTo(id){
       }
     }
     if(id==='inventario'){void limajeRefreshStockMap();renderInventario();populateCatFilters();}
+    if(id==='compras'){void limajeRefreshStockMap();renderComprasPage();}
     if(id==='cartera')renderCartera();
     if(id==='caja')renderCaja();
     if(id==='movimientos')renderMovimientos();
@@ -2095,27 +2216,50 @@ async function guardarPrefsBloqueo(){
 function limajeUpdateWipeCardVisibility(){
   var el=document.getElementById('limajeWipeTestDataCard');
   if(!el) return;
-  el.style.display=canManageUsers()?'block':'none';
+  el.style.display=(currentUser&&currentUser.role==='configurador')?'block':'none';
 }
-async function limajeEjecutarLimpiezaPruebas(){
-  if(!canManageUsers()){ alert2('Solo administrador o configurador','error'); return; }
-  var ids=['wipeMovements','wipeCartera','wipeCajaCierres','wipeDocPdf','wipeAudit','wipeWorkerPay','wipeLots','wipeCotizLocal'];
-  var any=ids.some(function(id){ var e=document.getElementById(id); return e&&e.checked; });
-  if(!any) return alert2('Marque al menos una opción.','error');
-  if(!confirm('¿Eliminar permanentemente los datos marcados en este dispositivo? No se puede deshacer. ¿Ha exportado respaldo JSON si lo necesita?')) return;
-  if(document.getElementById('wipeMovements')&&document.getElementById('wipeMovements').checked) DB.set('movements',[]);
-  if(document.getElementById('wipeCartera')&&document.getElementById('wipeCartera').checked) DB.set('cartera',[]);
-  if(document.getElementById('wipeCajaCierres')&&document.getElementById('wipeCajaCierres').checked) DB.set('cajaCierres',[]);
-  if(document.getElementById('wipeDocPdf')&&document.getElementById('wipeDocPdf').checked) DB.set('documentosExportados',[]);
-  if(document.getElementById('wipeAudit')&&document.getElementById('wipeAudit').checked) DB.set('auditLog',[]);
-  if(document.getElementById('wipeWorkerPay')&&document.getElementById('wipeWorkerPay').checked) DB.set('workerPayments',[]);
-  if(document.getElementById('wipeLots')&&document.getElementById('wipeLots').checked){ DB.set('inventoryLots',[]); }
-  if(document.getElementById('wipeCotizLocal')&&document.getElementById('wipeCotizLocal').checked) DB.set('cotizaciones',[]);
-  logAudit('limpieza_pruebas','Datos de prueba eliminados (opciones marcadas)','sistema',String(Date.now()));
-  ids.forEach(function(id){ var e=document.getElementById(id); if(e) e.checked=false; });
-  try{ await persistFullLimajeState(); }catch(e){ console.warn(e); }
-  try{ renderMovimientos(); renderCaja(); renderCartera(); renderDocumentosPage(); renderAuditoria(); renderTrabajadores(); renderCotizacionesList(); renderProducts(); }catch(e2){}
-  alert2('Listo. Datos locales limpiados y sincronizados cuando la red lo permita.','success');
+async function limajeResetSistemaConfigurador(){
+  if(!(currentUser&&currentUser.role==='configurador')){ alert2('Solo súper admin (configurador)','error'); return; }
+  if(!confirm('⚠ RESET COMPLETO\n\nSe borrarán TODOS los datos de este equipo (productos, inventario/lotes, movimientos, cartera, compras, PDFs, auditoría, trabajadores, etc.).\n\nAdemás: si hay conexión, se vaciarán las cotizaciones en la nube.\n\n¿Desea continuar?')) return;
+  if(!confirm('Segunda confirmación: ¿Seguro que desea resetear completamente el sistema?')) return;
+
+  // 1) Intentar vaciar cotizaciones en servidor
+  try{
+    var LM=window.__limajeSqlCore;
+    if(LM&&window.__limajeSupabase){
+      var out=await LM.purgeAllCotizacionesConfiguradorRpc();
+      if(out&&out.ok===false) console.warn('purge cotizaciones',out.error||out);
+    }
+  }catch(e){ /* si falla, igual continuamos con el reset local */ }
+
+  // 2) Reset local: vaciar todo lo persistido
+  try{
+    LIMaje_PERSIST_KEYS.forEach(function(k){
+      try{ DB.set(k, (k==='schemaVersion')?DB.get('schemaVersion',null):null ); }catch(e0){}
+    });
+  }catch(e1){}
+
+  // Garantiza arrays vacíos en claves clave (evita nulls inesperados)
+  DB.set('categories',[]);
+  DB.set('products',[]);
+  DB.set('inventoryLots',[]);
+  DB.set('movements',[]);
+  DB.set('cartera',[]);
+  DB.set('cajaCierres',[]);
+  DB.set('cotizaciones',[]);
+  DB.set('documentosExportados',[]);
+  DB.set('auditLog',[]);
+  DB.set('workers',[]);
+  DB.set('workerPayments',[]);
+  DB.set('compras',[]);
+  DB.set('gastosOperativosMes',{});
+  DB.set('app_prefs',DB.get('app_prefs',{}));
+
+  try{ await persistFullLimajeState(); }catch(e2){}
+  try{ await limajeRefreshStockMap(); }catch(e3){}
+  try{ renderDashboard(); renderProducts(); renderInventario(); renderCaja(); renderMovimientos(); renderCartera(); renderDocumentosPage(); renderAuditoria(); renderTrabajadores(); renderCotizacionesList(); }catch(e4){}
+  alert2('Sistema reseteado ✅','success');
+  logAudit('reset_sistema','Reset completo por configurador','sistema',String(Date.now()));
 }
 function limajeOnPresenceRemote(){
   var bid=document.getElementById('cotizPresenceBanner');if(!bid)return;
@@ -3173,10 +3317,10 @@ function buildReceiptHTML(mov,mode){
     </div>`;
   }).join('');
   const subtotal=(mov.items||[]).reduce(function(s,i){ return s+ventaItemSubtotalStored(i); },0);
-  /* Logo LIMAJE: diamantes verde(L,I), rojo(M,A), azul(J,E) para impresión */
+  /* Logo para impresión */
   const logoW=isA4?140:90; const logoH=isA4?32:22;
   const receiptLogo=`<div style="text-align:center;margin-bottom:6px;">
-    <img src="${limajeAssetUrl('logo.png')}" alt="Multi-cerámica LIMAJE" style="max-height:${isA4?'52px':'36px'};width:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto 4px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+    <img src="${limajeAssetUrl(LIMAJE_BRAND_LOGO_REL)}" alt="${LIMAJE_BRAND_COMPANY_NAME}" style="max-height:${isA4?'52px':'36px'};width:auto;max-width:100%;object-fit:contain;display:block;margin:0 auto 4px;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
     <svg viewBox="0 0 120 28" width="${logoW}" height="${logoH}" style="display:none;vertical-align:middle;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
       <polygon points="10,2 18,14 10,26 2,14" fill="#2e7d32"/><text x="10" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">L</text>
       <polygon points="28,2 36,14 28,26 20,14" fill="#2e7d32"/><text x="28" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">I</text>
@@ -3767,7 +3911,7 @@ function generateReport(){
         <rect x="12" y="60" width="56" height="8" rx="3" fill="#4db8a8"/>
       </svg>
       <div>
-        <div style="font-family:'Dancing Script',cursive;font-size:21px;color:var(--teal-dk);">Reporte — Multi-cerámica LIMAJE</div>
+        <div style="font-family:'Dancing Script',cursive;font-size:21px;color:var(--teal-dk);">Reporte — Multi-Cerámica San Juan</div>
         <div style="color:var(--text2);font-size:12px;">Del ${dateLabel(from)} al ${dateLabel(to)}${activeFilters.length?' | 🔍 '+activeFilters.join(' | '):''}</div>
       </div>
     </div>
@@ -4816,9 +4960,9 @@ function pdfDateParts(){
 function pdfSuggestedFilename(tipo, refId){
   var p=pdfDateParts();
   var slug={cotizacion:'Cotizacion',venta:'ReciboVenta'}[tipo]||'Documento';
-  return 'LIMAJE_'+p.ym+'_'+slug+'_'+refId+'.pdf';
+  return 'SAN_JUAN_'+p.ym+'_'+slug+'_'+refId+'.pdf';
 }
-var PDF_EMPRESA_NOMBRE='Multi-cerámica LIMAJE';
+var PDF_EMPRESA_NOMBRE=LIMAJE_BRAND_COMPANY_NAME;
 var PDF_EMPRESA_EMAIL='limajemulticeramica@gmail.com';
 var PDF_EMPRESA_TEL='5453-3143';
 var PDF_BRAND_G=[46,125,50], PDF_BRAND_R=[198,40,40], PDF_BRAND_B=[21,101,192];
@@ -4879,12 +5023,12 @@ function pdfLoadLogo(callback){
     fr.onerror=function(){ next(null); };
     fr.readAsDataURL(blob);
   }
-  fetch(limajeAssetUrl('logo.png'),{cache:'reload'})
+  fetch(limajeAssetUrl(LIMAJE_BRAND_LOGO_REL),{cache:'reload'})
     .then(function(r){ return r.ok?r.blob():Promise.reject(); })
     .then(function(b){ fromBlob(b,function(u){ callback(u||pdfLogoBadgeDataUrl()); }); })
     .catch(function(){
       var xhr=new XMLHttpRequest();
-      xhr.open('GET',limajeAssetUrl('logo.png'),true);
+      xhr.open('GET',limajeAssetUrl(LIMAJE_BRAND_LOGO_REL),true);
       xhr.responseType='blob';
       xhr.onload=function(){
         if((xhr.status===200||xhr.status===0)&&xhr.response&&xhr.response.size)
@@ -5745,11 +5889,11 @@ function exportarJSON(){
   const now = new Date();
   // Nombre dinámico con fecha y hora exacta
   const pad = n => String(n).padStart(2,'0');
-  const nombreFecha = `Multiceramica_Limaje_${pad(now.getDate())}_${pad(now.getMonth()+1)}_${now.getFullYear()}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const nombreFecha = `Multiceramica_SanJuan_${pad(now.getDate())}_${pad(now.getMonth()+1)}_${now.getFullYear()}_${pad(now.getHours())}${pad(now.getMinutes())}`;
 
   const data = {
     schemaVersion: SCHEMA_VERSION,
-    appName: 'Multi-cerámica LIMAJE',
+    appName: LIMAJE_BRAND_COMPANY_NAME,
     exportedAt: now.toISOString(),
     exportedBy: (currentUser&&currentUser.username) || 'unknown',
     categories:  DB.get('categories',[]),
@@ -5764,6 +5908,8 @@ function exportarJSON(){
     auditLog:    DB.get('auditLog',[]),
     workers:     DB.get('workers',[]),
     workerPayments: DB.get('workerPayments',[]),
+    compras: DB.get('compras',[]),
+    gastosOperativosMes: DB.get('gastosOperativosMes',{}),
   };
 
   const json = JSON.stringify(data, null, 2);
@@ -5795,7 +5941,7 @@ function importarJSON(event){
         if(res) res.innerHTML='<div class="alert alert-error">❌ Archivo inválido: no contiene datos reconocibles.</div>';
         event.target.value=''; return;
       }
-      if(raw.appName && raw.appName !== 'La Casa de los Textiles' && raw.appName !== 'MULTI-TEXTILES LIMAJE' && raw.appName !== 'Multi-cerámica LIMAJE'){
+      if(raw.appName && raw.appName !== LIMAJE_BRAND_COMPANY_NAME && raw.appName !== 'La Casa de los Textiles' && raw.appName !== 'MULTI-TEXTILES LIMAJE' && raw.appName !== 'Multi-cerámica LIMAJE'){
         if(res) res.innerHTML='<div class="alert alert-error">❌ Este respaldo pertenece a otra aplicación: '+escapeHtml(String(raw.appName))+'</div>';
         event.target.value=''; return;
       }
@@ -5843,6 +5989,8 @@ function importarJSON(event){
       if(data.auditLog)    DB.set('auditLog',    data.auditLog);
       if(data.workers)     DB.set('workers',     data.workers);
       if(data.workerPayments) DB.set('workerPayments', data.workerPayments);
+      DB.set('compras', data.compras||[]);
+      DB.set('gastosOperativosMes', data.gastosOperativosMes||{});
       DB.set('schemaVersion', SCHEMA_VERSION);
 
       void (async function(){
@@ -6061,6 +6209,343 @@ function bindLimajeAuthUi(){
   if(nov) nov.addEventListener('click',function(){ closeNavDrawer(); });
   var ncl=document.getElementById('navDrawerClose');
   if(ncl) ncl.addEventListener('click',function(){ closeNavDrawer(); });
+}
+
+// ============================================================
+// COMPRAS + COSTEO (gastos operativos prorrateados)
+// ============================================================
+var __comprasLineasTmp=[];
+var __comprasExtrasTmp=[];
+var __comprasSelectedProdId=null;
+
+function getCompras(){ return DB.get('compras',[]); }
+function getGastosOperativosMesMap(){ return DB.get('gastosOperativosMes',{}); }
+function comprasMesKeyFromDateStr(d){ return String(d||today()).slice(0,7); } // YYYY-MM
+function comprasDaysInMonth(ym){
+  try{
+    var y=parseInt(String(ym).slice(0,4),10), m=parseInt(String(ym).slice(5,7),10);
+    if(!y||!m) return 30;
+    return new Date(y,m,0).getDate();
+  }catch(e){ return 30; }
+}
+function comprasCalcDaily(total,dias){
+  var t=Number(total)||0;
+  var d=Math.max(1,parseInt(dias,10)||30);
+  return t/d;
+}
+function comprasDiasAIncluir(tipo, fecha, diasMes, diasOtros){
+  if(tipo==='pendiente_abastecimiento') return 1;
+  if(tipo==='otros') return Math.max(0,parseInt(diasOtros,10)||0);
+  var dm=parseInt(diasMes,10)||30;
+  var day=15;
+  try{ day=new Date(String(fecha||today())+'T12:00:00').getDate(); }catch(e){}
+  return Math.max(0, dm - day);
+}
+function comprasGetOpForMonth(ym){
+  var map=getGastosOperativosMesMap();
+  return map && map[ym] ? map[ym] : null;
+}
+function comprasOpTotalFromInputs(){
+  var fields=['opInternet','opAlquiler','opLuz','opTelefono','opAgua','opSalarios'];
+  return fields.reduce(function(s,id){ return s + (parseFloat(valById(id))||0); },0);
+}
+function comprasRenderOpResumen(op){
+  var el=document.getElementById('opResumen'); if(!el) return;
+  if(!op){ el.innerHTML='<div class="alert alert-error">No hay gastos operativos guardados para este mes. Ingréselos arriba para que el costeo sea exacto.</div>'; return; }
+  var daily=comprasCalcDaily(op.total,op.diasMes);
+  el.innerHTML='<div class="alert alert-success">✅ Guardado: <strong>'+escapeHtml(String(op.mes))+'</strong> · Total '+fmt(op.total)+' · Diario '+fmt(daily)+' ('+op.diasMes+' días)</div>';
+}
+function comprasCargarGastosOperativos(force){
+  var mesEl=document.getElementById('opMes'); if(!mesEl) return;
+  var mes=mesEl.value;
+  if(!mes||force){
+    mes=comprasMesKeyFromDateStr(today());
+    mesEl.value=mes;
+  }
+  var op=comprasGetOpForMonth(mes);
+  var dias=(op&&op.diasMes)||comprasDaysInMonth(mes);
+  var diasEl=document.getElementById('opDiasMes'); if(diasEl) diasEl.value=dias;
+  var setN=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v!=null?String(v):''); };
+  setN('opInternet',op&&op.items?op.items.internet:0);
+  setN('opAlquiler',op&&op.items?op.items.alquiler:0);
+  setN('opLuz',op&&op.items?op.items.luz:0);
+  setN('opTelefono',op&&op.items?op.items.telefono:0);
+  setN('opAgua',op&&op.items?op.items.agua:0);
+  setN('opSalarios',op&&op.items?op.items.salarios:0);
+  var totalEl=document.getElementById('opTotal');
+  if(totalEl) totalEl.value=(op&&op.total!=null)?op.total:comprasOpTotalFromInputs();
+  comprasRenderOpResumen(op);
+}
+function comprasGuardarGastosOperativos(){
+  var mes=String(valById('opMes')||'').trim();
+  if(!mes) mes=comprasMesKeyFromDateStr(today());
+  var diasMes=parseInt(valById('opDiasMes'),10)||comprasDaysInMonth(mes);
+  var items={
+    internet:parseFloat(valById('opInternet'))||0,
+    alquiler:parseFloat(valById('opAlquiler'))||0,
+    luz:parseFloat(valById('opLuz'))||0,
+    telefono:parseFloat(valById('opTelefono'))||0,
+    agua:parseFloat(valById('opAgua'))||0,
+    salarios:parseFloat(valById('opSalarios'))||0
+  };
+  var total=parseFloat(valById('opTotal'));
+  if(!(total>=0)) total=items.internet+items.alquiler+items.luz+items.telefono+items.agua+items.salarios;
+  var map=getGastosOperativosMesMap();
+  map[mes]={ mes:mes, diasMes:diasMes, items:items, total:total, updatedAt:Date.now(), updatedBy:(currentUser&&currentUser.username)||'' };
+  DB.set('gastosOperativosMes',map);
+  comprasRenderOpResumen(map[mes]);
+  alert2('Gastos operativos guardados ✅','success');
+}
+function comprasOnTipoChange(){
+  var t=valById('compTipo')||'inventario';
+  var d=document.getElementById('compDiasOtros');
+  if(d){ d.disabled=(t!=='otros'); if(t!=='otros') d.value=0; }
+  comprasRenderTotales();
+}
+function comprasExtraAdd(){
+  var desc=(valById('compExtraDesc')||'').trim();
+  var tipo=valById('compExtraTipo')||'fijo';
+  var valor=parseFloat(valById('compExtraValor'))||0;
+  if(!desc) return alert2('Escriba el concepto del adicional','error');
+  if(valor<=0) return alert2('Ingrese un valor válido','error');
+  __comprasExtrasTmp.push({ id:Date.now()+Math.random(), desc:desc, tipo:tipo, valor:valor });
+  var e=document.getElementById('compExtraDesc'); if(e) e.value='';
+  var v=document.getElementById('compExtraValor'); if(v) v.value=0;
+  comprasRenderExtras();
+  comprasRenderTotales();
+}
+function comprasExtraRemove(id){
+  __comprasExtrasTmp=__comprasExtrasTmp.filter(function(x){ return String(x.id)!==String(id); });
+  comprasRenderExtras();
+  comprasRenderTotales();
+}
+function comprasRenderExtras(){
+  var el=document.getElementById('compExtrasList'); if(!el) return;
+  if(!__comprasExtrasTmp.length){ el.innerHTML='<div style="font-size:12px;color:var(--text2);">Sin adicionales.</div>'; return; }
+  el.innerHTML='<table><thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th></th></tr></thead><tbody>'+
+    __comprasExtrasTmp.map(function(x){
+      var t={fijo:'Fijo',caja:'Q/caja',m2:'Q/m²',pieza:'Q/pz'}[x.tipo]||x.tipo;
+      return '<tr><td>'+escapeHtmlLot(x.desc)+'</td><td>'+escapeHtmlLot(t)+'</td><td>'+fmt(x.valor)+'</td><td><button class="btn btn-sm btn-danger" onclick="comprasExtraRemove(\''+String(x.id)+'\')">✕</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+function comprasBuscarProductos(){
+  var q=(valById('compBuscarProd')||'').trim().toLowerCase();
+  var res=document.getElementById('compBuscarResults');
+  if(!res) return;
+  if(!q){ res.style.display='none'; res.innerHTML=''; __comprasSelectedProdId=null; return; }
+  var prods=getProducts();
+  var list=prods.filter(function(p){
+    return (String(p.code||'').toLowerCase().indexOf(q)>=0) || (String(p.name||'').toLowerCase().indexOf(q)>=0);
+  }).slice(0,30);
+  if(!list.length){ res.style.display='block'; res.innerHTML='<div style="padding:10px;color:var(--text2);font-size:12px;">Sin resultados</div>'; return; }
+  res.style.display='block';
+  res.innerHTML=list.map(function(p){
+    var meta=(p.m2PerBox?(' · '+p.m2PerBox+' m²/cj'):'')+(p.piecesPerBox?(' · '+p.piecesPerBox+' pzs/cj'):'');
+    return '<div style="padding:10px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="comprasSelectProd('+p.id+')"><div style="font-weight:700;color:var(--teal-dk)">'+escapeHtmlLot(p.name)+'</div><div style="font-size:11px;color:var(--text2)">'+escapeHtmlLot(p.code||'')+meta+'</div></div>';
+  }).join('');
+}
+function comprasSelectProd(pid){
+  __comprasSelectedProdId=pid;
+  var p=getProdById(pid);
+  var inp=document.getElementById('compBuscarProd');
+  if(inp&&p) inp.value=(p.code?(''+p.code+' — '):'')+p.name;
+  var res=document.getElementById('compBuscarResults'); if(res){ res.style.display='none'; res.innerHTML=''; }
+}
+
+function comprasLineaAddManual(){
+  var pid=__comprasSelectedProdId;
+  var p=pid?getProdById(pid):null;
+  var mode=valById('compLineaModo')||'cajas';
+  var qty=parseFloat(valById('compLineaQty'))||0;
+  var unitCost=parseFloat(valById('compLineaCosto'))||0;
+  if(!p) return alert2('Seleccione un producto desde la búsqueda','error');
+  if(qty<=0) return alert2('Ingrese cantidad válida','error');
+  if(unitCost<0) return alert2('Precio inválido','error');
+
+  var stockQty=qty;
+  if(mode==='m2'){
+    var m2pb=Number(p.m2PerBox)||0;
+    if(!(m2pb>0)) return alert2('Este producto no tiene m² por caja configurado','error');
+    stockQty=qty/m2pb;
+  }else if(mode==='piezas'){
+    var pzpb=Number(p.piecesPerBox)||0;
+    if(!(pzpb>0)) return alert2('Este producto no tiene piezas por caja configurado','error');
+    stockQty=qty/pzpb;
+  }else{
+    stockQty=qty;
+  }
+  if(stockQty<=STOCK_EPS) return alert2('Cantidad muy pequeña','error');
+  __comprasLineasTmp.push({ lineId:Date.now()+Math.random(), productId:p.id, code:p.code||'', name:p.name||'', qtyMode:mode, qty:qty, unitCost:unitCost, stockQty:stockQty });
+  comprasRenderLineas();
+  comprasRenderTotales();
+  var q=document.getElementById('compLineaQty'); if(q) q.value=1;
+}
+function comprasLineaRemove(lineId){
+  __comprasLineasTmp=__comprasLineasTmp.filter(function(l){ return String(l.lineId)!==String(lineId); });
+  comprasRenderLineas();
+  comprasRenderTotales();
+}
+function comprasRenderLineas(){
+  var el=document.getElementById('compLineasTable'); if(!el) return;
+  if(!__comprasLineasTmp.length){ el.innerHTML='<p style="color:var(--text2);font-size:13px;">Sin líneas. Busque un producto y pulse «Añadir línea».</p>'; return; }
+  el.innerHTML='<table><thead><tr><th>Producto</th><th>Modo</th><th>Cant.</th><th>Precio unit.</th><th>Ingresa a stock</th><th>Subtotal</th><th></th></tr></thead><tbody>'+
+    __comprasLineasTmp.map(function(l){
+      var modeLab={cajas:'Cajas',m2:'m²',piezas:'Piezas',unidad:'Unidad'}[l.qtyMode]||l.qtyMode;
+      var stockLab=(l.qtyMode==='cajas'||l.qtyMode==='m2'||l.qtyMode==='piezas')?(fmtStockCajas(l.stockQty)+' cj.'):(String(l.stockQty)+' un.');
+      var sub=(Number(l.qty)||0)*(Number(l.unitCost)||0);
+      return '<tr><td><span style="font-size:11px;color:var(--text2)">'+escapeHtmlLot(l.code)+'</span><br><strong>'+escapeHtmlLot(l.name)+'</strong></td>'+
+        '<td>'+modeLab+'</td><td>'+escapeHtmlLot(String(l.qty))+'</td><td>'+fmt(l.unitCost)+'</td><td>'+stockLab+'</td><td><strong>'+fmt(sub)+'</strong></td>'+
+        '<td><button class="btn btn-sm btn-danger" onclick="comprasLineaRemove(\''+String(l.lineId)+'\')">✕</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+function comprasComputeAllocations(){
+  var tipo=valById('compTipo')||'inventario';
+  var fecha=valById('compFecha')||today();
+  var ym=comprasMesKeyFromDateStr(fecha);
+  var op=comprasGetOpForMonth(ym);
+  var diasMes=(op&&op.diasMes)||comprasDaysInMonth(ym);
+  var daily=op?comprasCalcDaily(op.total,diasMes):0;
+  var diasIncl=comprasDiasAIncluir(tipo,fecha,diasMes,valById('compDiasOtros'));
+  var opTotal=daily*diasIncl;
+  var baseTotals=__comprasLineasTmp.map(function(l){ return (Number(l.qty)||0)*(Number(l.unitCost)||0); });
+  var baseSum=baseTotals.reduce(function(s,x){ return s+x; },0) || 0;
+  var units={caja:0,m2:0,pieza:0};
+  __comprasLineasTmp.forEach(function(l){
+    var p=getProdById(l.productId);
+    var cj=Number(l.stockQty||0);
+    units.caja+=cj;
+    if(p&&Number(p.m2PerBox)>0) units.m2 += cj*Number(p.m2PerBox);
+    if(p&&Number(p.piecesPerBox)>0) units.pieza += cj*Number(p.piecesPerBox);
+  });
+  var extraTotal=0;
+  __comprasExtrasTmp.forEach(function(x){
+    if(x.tipo==='fijo') extraTotal+=Number(x.valor)||0;
+    else if(x.tipo==='caja') extraTotal+=(Number(x.valor)||0)*(units.caja||0);
+    else if(x.tipo==='m2') extraTotal+=(Number(x.valor)||0)*(units.m2||0);
+    else if(x.tipo==='pieza') extraTotal+=(Number(x.valor)||0)*(units.pieza||0);
+  });
+  var perLineExtra=__comprasLineasTmp.map(function(l,idx){
+    var p=getProdById(l.productId);
+    var cj=Number(l.stockQty||0);
+    var m2=(p&&Number(p.m2PerBox)>0)?(cj*Number(p.m2PerBox)):0;
+    var pz=(p&&Number(p.piecesPerBox)>0)?(cj*Number(p.piecesPerBox)):0;
+    var base=baseTotals[idx]||0;
+    var alloc=0;
+    __comprasExtrasTmp.forEach(function(x){
+      var v=Number(x.valor)||0;
+      if(x.tipo==='fijo') alloc += (baseSum>0)? (v*(base/baseSum)) : 0;
+      else if(x.tipo==='caja') alloc += v*cj;
+      else if(x.tipo==='m2') alloc += v*m2;
+      else if(x.tipo==='pieza') alloc += v*pz;
+    });
+    return alloc;
+  });
+  var perLineOp=__comprasLineasTmp.map(function(l,idx){
+    var base=baseTotals[idx]||0;
+    return (baseSum>0)? (opTotal*(base/baseSum)) : 0;
+  });
+  return { ym:ym, op:op, diasMes:diasMes, daily:daily, diasIncl:diasIncl, opTotal:opTotal, baseSum:baseSum, baseTotals:baseTotals, extraTotal:extraTotal, perLineExtra:perLineExtra, perLineOp:perLineOp };
+}
+function comprasRenderTotales(){
+  var el=document.getElementById('compTotales'); if(!el) return;
+  var alloc=comprasComputeAllocations();
+  var msgOp=alloc.op?('Gastos operativos '+escapeHtml(alloc.ym)+': total '+fmt(alloc.op.total)+' / '+alloc.diasMes+' días = '+fmt(alloc.daily)+' por día. Se incluirán <strong>'+alloc.diasIncl+' día(s)</strong> → '+fmt(alloc.opTotal)+'.')
+                :('⚠ No hay gastos operativos guardados para '+escapeHtml(alloc.ym)+'. Se calculará con 0.');
+  var total=alloc.baseSum + alloc.extraTotal + alloc.opTotal;
+  el.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">'+
+    '<div><strong>Base compra:</strong> '+fmt(alloc.baseSum)+'</div>'+
+    '<div><strong>Adicionales:</strong> '+fmt(alloc.extraTotal)+'</div>'+
+    '<div><strong>Gastos prorrateados:</strong> '+fmt(alloc.opTotal)+'</div>'+
+    '<div style="margin-left:auto;"><strong>TOTAL COMPRA:</strong> <span style="color:var(--teal-dk);font-size:16px;">'+fmt(total)+'</span></div>'+
+    '</div><div style="margin-top:8px;font-size:12px;color:var(--text2);">'+msgOp+'</div>';
+}
+
+async function comprasGuardarCompra(){
+  if(!canAdjustStock()) return alert2('Sin permiso para ingresar stock','error');
+  if(!__comprasLineasTmp.length) return alert2('Agregue al menos una línea','error');
+  var fecha=valById('compFecha')||today();
+  var tipo=valById('compTipo')||'inventario';
+  var diasOtros=parseInt(valById('compDiasOtros'),10)||0;
+  var prov=(valById('compProveedor')||'').trim();
+  var factura=(valById('compFactura')||'').trim();
+  var loc=valById('compBodega')||'LOCAL';
+  var alloc=comprasComputeAllocations();
+  var totalCompra=alloc.baseSum+alloc.extraTotal+alloc.opTotal;
+  var prods=getProducts().slice();
+  var updateCost=!!(document.getElementById('compActualizarCosto')&&document.getElementById('compActualizarCosto').checked);
+  __comprasLineasTmp.forEach(function(l,idx){
+    var pIdx=prods.findIndex(function(pp){ return pp.id===l.productId; });
+    if(pIdx<0) return;
+    ensureStockByLoc(prods[pIdx]);
+    var stockQty=Number(l.stockQty)||0;
+    prods[pIdx].stockByLocation[loc]=(Number(prods[pIdx].stockByLocation[loc])||0)+stockQty;
+    recomputeStockTotal(prods[pIdx]);
+    addQtyToLots(l.productId,loc,stockQty,('COMPRA '+fecha+(factura?(' '+factura):'')));
+    var realTotal=(alloc.baseTotals[idx]||0)+(alloc.perLineExtra[idx]||0)+(alloc.perLineOp[idx]||0);
+    var realUnitCost=(stockQty>0)?(realTotal/stockQty):0;
+    if(updateCost && realUnitCost>0){
+      var oldCost=Number(prods[pIdx].priceCost)||0;
+      var oldStock=Math.max(0,Number(prods[pIdx].stock||0)-stockQty);
+      var newCost=(oldStock+stockQty)>0 ? ((oldCost*oldStock)+(realUnitCost*stockQty))/(oldStock+stockQty) : realUnitCost;
+      prods[pIdx].priceCost=Number(newCost.toFixed(4));
+      if(!prods[pIdx].priceHistory) prods[pIdx].priceHistory=[];
+      prods[pIdx].priceHistory.push({ts:Date.now(),oldPrice:prods[pIdx].price,oldPriceCost:oldCost,oldPriceLimit:prods[pIdx].priceLimit,newPrice:prods[pIdx].price,newPriceCost:prods[pIdx].priceCost,newPriceLimit:prods[pIdx].priceLimit,changedBy:(currentUser&&currentUser.username)||'sistema'});
+    }
+  });
+  DB.set('products',prods);
+  var compraId=Date.now()+Math.floor(Math.random()*1e4);
+  var compraRec={ id:compraId, ts:Date.now(), fecha:fecha, tipo:tipo, diasOtros:(tipo==='otros'?diasOtros:0), proveedor:prov, factura:factura, bodega:loc,
+    gastosMes:alloc.ym, gastosDiasIncl:alloc.diasIncl, gastosTotal:alloc.opTotal, extras:__comprasExtrasTmp.slice(),
+    lineas:__comprasLineasTmp.map(function(l,idx){ return Object.assign({},l,{ baseTotal:alloc.baseTotals[idx]||0, extraAlloc:alloc.perLineExtra[idx]||0, opAlloc:alloc.perLineOp[idx]||0, realTotal:(alloc.baseTotals[idx]||0)+(alloc.perLineExtra[idx]||0)+(alloc.perLineOp[idx]||0) }); }),
+    total:totalCompra, creadoPor:(currentUser&&currentUser.username)||'', creadoRol:(currentUser&&currentUser.role)||'' };
+  var compras=getCompras(); compras.unshift(compraRec); if(compras.length>2000) compras=compras.slice(0,2000); DB.set('compras',compras);
+  if(document.getElementById('compRegistrarEgreso')&&document.getElementById('compRegistrarEgreso').checked){
+    var mvs=getMovements();
+    mvs.push({id:nextMovementId(),type:'egreso',ts:nowTs(),date:fecha,total:totalCompra,desc:('Compra mercadería'+(prov?(' · '+prov):'')+(factura?(' · Doc '+factura):'')),categ:'Compra de mercadería',pago:'',vendedor:(currentUser&&currentUser.username)||'',meta:{ compraId:compraId }});
+    DB.set('movements',mvs);
+  }
+  logAudit('compra','Compra '+tipo+' '+fmt(totalCompra),'compras',String(compraId));
+  alert2('Compra registrada ✅','success');
+  try{ renderInventario(); renderProducts(); renderDashboard(); renderCaja(); renderMovimientos(); }catch(e){}
+  void (async function(){
+    try{
+      await window.__limajeSqlCore.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+      compraRec.lineas.forEach(function(l){ try{ window.__limajeSqlCore.abastecimientoCubrirRpc(l.productId, loc); }catch(e0){} });
+      await limajeRefreshStockMap();
+      await flushPersistQueue();
+    }catch(e){}
+  })();
+  __comprasLineasTmp=[]; __comprasExtrasTmp=[]; __comprasSelectedProdId=null;
+  var inp=document.getElementById('compBuscarProd'); if(inp) inp.value='';
+  var pp=document.getElementById('compProveedor'); if(pp) pp.value='';
+  var ff=document.getElementById('compFactura'); if(ff) ff.value='';
+  comprasRenderExtras(); comprasRenderLineas(); comprasRenderTotales();
+  renderComprasPage();
+}
+
+function renderComprasPage(){
+  var f=document.getElementById('compFecha'); if(f&&!f.value) f.value=today();
+  var mesEl=document.getElementById('opMes'); if(mesEl&&!mesEl.value) mesEl.value=comprasMesKeyFromDateStr(today());
+  var diasEl=document.getElementById('opDiasMes'); if(diasEl&&!diasEl.value) diasEl.value=comprasDaysInMonth(mesEl.value);
+  comprasCargarGastosOperativos(false);
+  comprasOnTipoChange();
+  comprasRenderExtras();
+  comprasRenderLineas();
+  comprasRenderTotales();
+  var from=valById('comprasFrom')||'';
+  var to=valById('comprasTo')||'';
+  var list=getCompras().filter(function(c){ if(from&&c.fecha<from) return false; if(to&&c.fecha>to) return false; return true; });
+  var el=document.getElementById('comprasHistTable'); if(!el) return;
+  if(!list.length){ el.innerHTML='<p style="color:var(--text2);padding:8px 0;">Sin compras en este rango.</p>'; return; }
+  el.innerHTML='<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Proveedor</th><th>Documento</th><th>Bodega</th><th>Líneas</th><th>Total</th></tr></thead><tbody>'+
+    list.map(function(c){
+      var tipoLab={inventario:'Inventario',pendiente_abastecimiento:'Pend. abastecimiento',otros:'Otros'}[c.tipo]||c.tipo;
+      return '<tr><td style="white-space:nowrap;font-size:11px;">'+escapeHtmlLot(dateLabel(c.fecha))+'</td><td>'+escapeHtmlLot(tipoLab)+'</td>'+
+        '<td style="font-size:12px;">'+escapeHtmlLot(c.proveedor||'—')+'</td><td style="font-size:12px;">'+escapeHtmlLot(c.factura||'—')+'</td>'+
+        '<td>'+escapeHtmlLot(LOC_LABELS[c.bodega]||c.bodega)+'</td><td>'+String((c.lineas||[]).length)+'</td><td><strong>'+fmt(c.total||0)+'</strong></td></tr>';
+    }).join('')+'</tbody></table>';
 }
 bindLimajeAuthUi();
 window.__limajeBootPromise=bootLimajeApp();
