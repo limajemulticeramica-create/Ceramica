@@ -5010,9 +5010,24 @@ function aplicarVentaDesdeCotizacion(ventaJson){
     vendedor:ventaJson.vendedor||'', items:enrichedItems
   });
   DB.set('movements',mvs);
+  // Si la cotización se confirmó como crédito, crear cuenta por cobrar para abonos en cartera.
+  var pagoNorm=String(ventaJson.pago||'').trim().toLowerCase();
+  if(pagoNorm==='credito'){
+    var cartera=getCartera();
+    var movId=ventaJson.id;
+    var exists=cartera.some(function(c){ return String(c.movId)===String(movId)||String(c.id)===String(movId); });
+    if(!exists){
+      cartera.push({
+        id:movId,movId:movId,cliente:ventaJson.note||'Sin nombre',ts:ventaJson.ts||nowTs(),date:ventaJson.date||today(),
+        total:Number(ventaJson.total)||0,abonado:0,saldo:Number(ventaJson.total)||0,estado:'pendiente',
+        historial:[],items:JSON.parse(JSON.stringify(enrichedItems))
+      });
+      DB.set('cartera',cartera);
+    }
+  }
   logAudit('venta_cotiz','Venta #'+ventaJson.id+' desde cotización','ventas',ventaJson.id);
 }
-async function cotizConfirmarDesdeLista(id){
+async function cotizConfirmarDesdeLista(id,pagoModo){
   if(!canSell()) return;
   var q=getCotizaciones().find(function(x){ return x.id===id; });
   if(!q){ alert2('No encontrada','error'); return; }
@@ -5021,8 +5036,10 @@ async function cotizConfirmarDesdeLista(id){
   var LM=window.__limajeSqlCore;
   try{
     await LM.syncStockPhysical(getProducts, ensureStockByLoc, stockAtLoc, LOC_CODES);
+    var pagoSel=String(pagoModo||'Efectivo').trim().toLowerCase();
+    var pagoFinal=(pagoSel==='credito')?'credito':'Efectivo';
     var meta={
-      pago:'Efectivo', next_venta_id: nextMovementId(), date:today(), ts: nowTs(),
+      pago:pagoFinal, next_venta_id: nextMovementId(), date:today(), ts: nowTs(),
       note:'Cot. #'+q.id+' — '+(q.cliente||'').trim(),
       nit:q.nit||'', numeroFactura:'', vendedor:(currentUser&&currentUser.username)||''
     };
@@ -5058,8 +5075,13 @@ async function cotizConfirmarDesdeLista(id){
   }
 }
 function cotizPromptConfirmar(id){
-  if(!confirm('¿Confirmar esta cotización? Se generará la venta, se descontará inventario (por bodega/lote según FIFO) y se abrirá el recibo para compartir o imprimir.')) return;
-  void cotizConfirmarDesdeLista(id);
+  var modo=prompt('Forma de pago para convertir esta cotización:\n\n1 = Efectivo\n2 = Crédito (irá a cartera para abonos)\n\nEscriba 1 o 2.','1');
+  if(modo===null) return;
+  modo=String(modo||'').trim();
+  var pago=(modo==='2'||modo.toLowerCase()==='credito')?'credito':'Efectivo';
+  var txtPago=(pago==='credito'?'CRÉDITO (se creará cuenta en cartera)':'EFECTIVO');
+  if(!confirm('¿Confirmar esta cotización como '+txtPago+'?\n\nSe generará la venta y se descontará inventario por FIFO.')) return;
+  void cotizConfirmarDesdeLista(id,pago);
 }
 function pdfDateParts(){
   var d=new Date();
@@ -5342,6 +5364,27 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
       y+=ih+6;
     }catch(e){ doc.text('(Imagen no incluida)',M,y); y+=6; }
   }
+  // Bloque final profesional: validez y firmas
+  if(y>246){ doc.addPage(); y=18; }
+  doc.setDrawColor(206,214,220);
+  doc.setFillColor(250,252,253);
+  doc.roundedRect(M,y,W,24,2,2,'FD');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(8.2);
+  doc.setTextColor(62,70,76);
+  doc.text('Validez de cotización: 7 días calendario (salvo cambio de costos/stock).',M+3,y+6);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(7.6);
+  doc.text('Precios sujetos a disponibilidad por bodega y confirmación al momento de facturar.',M+3,y+11);
+  var fy=y+20;
+  doc.setDrawColor(150,160,168);
+  doc.line(M+10,fy,M+80,fy);
+  doc.line(M+102,fy,M+172,fy);
+  doc.setFontSize(7.2);
+  doc.setTextColor(95,100,98);
+  doc.text('Asesor comercial',M+45,fy+3,{align:'center'});
+  doc.text('Cliente / autorización',M+137,fy+3,{align:'center'});
+
   doc.setFontSize(7.2);
   doc.setTextColor(95,100,98);
   var foot1=PDF_EMPRESA_NOMBRE+'  ·  '+PDF_EMPRESA_EMAIL+'  ·  Tel. '+PDF_EMPRESA_TEL;
