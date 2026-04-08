@@ -156,6 +156,13 @@
     return r.data;
   };
 
+  L.resetKvConfiguradorRpc = async function (epoch) {
+    var sb = L.getSb();
+    var r = await sb.rpc('limaje_configurador_reset_kv', { p_epoch: Number(epoch) || Date.now() });
+    if (r.error) throw r.error;
+    return r.data;
+  };
+
   L.abastecimientoCubrirRpc = async function (productId, locationCode) {
     var sb = L.getSb();
     var r = await sb.rpc('limaje_abastecimiento_intentar_cubrir', {
