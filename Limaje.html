@@ -2454,7 +2454,11 @@ async function limajeReiniciarNumeracionDocumentosConfigurador(){
   try{
     if(window.__limajeSupabase&&window.__limajeSqlCore){
       try{
-        await window.__limajeSqlCore.purgeAllCotizacionesConfiguradorRpc();
+        if(typeof window.__limajeSqlCore.resetCotizacionNumeracionRpc==='function'){
+          await window.__limajeSqlCore.resetCotizacionNumeracionRpc();
+        }else{
+          await window.__limajeSqlCore.purgeAllCotizacionesConfiguradorRpc();
+        }
       }catch(eRpc){
         cloudOk=false;
         console.warn(eRpc);

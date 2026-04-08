@@ -163,6 +163,13 @@
     return r.data;
   };
 
+  L.resetCotizacionNumeracionRpc = async function () {
+    var sb = L.getSb();
+    var r = await sb.rpc('limaje_configurador_reset_cotizacion_numeracion');
+    if (r.error) throw r.error;
+    return r.data;
+  };
+
   L.abastecimientoCubrirRpc = async function (productId, locationCode) {
     var sb = L.getSb();
     var r = await sb.rpc('limaje_abastecimiento_intentar_cubrir', {
