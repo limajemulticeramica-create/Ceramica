@@ -1098,9 +1098,10 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 // DATA LAYER — memoria + Supabase (sin localStorage / IndexedDB)
 // ============================================================
 var _kvCache=Object.create(null);
+var _kvUpdatedAt=Object.create(null);
 var _persistTimer=null;
 var _dirtyKeys=new Set();
-var LIMaje_PERSIST_KEYS=['categories','products','movements','cartera','cajaCierres','locations','inventoryLots','cotizaciones','documentosExportados','auditLog','workers','workerPayments','workerMonthLedger','schemaVersion','app_prefs','compras','gastosOperativosMes'];
+var LIMaje_PERSIST_KEYS=['categories','products','movements','cartera','cajaCierres','locations','inventoryLots','cotizaciones','documentosExportados','auditLog','workers','workerPayments','workerMonthLedger','schemaVersion','app_prefs','compras','gastosOperativosMes','systemEpoch'];
 function getKvWritableKeysForRole(role){
   if(role==='admin'||role==='contador'||role==='configurador') return LIMaje_PERSIST_KEYS.slice();
   if(role==='vendedor') return ['movements','cartera','products','inventoryLots','locations','cotizaciones','documentosExportados','auditLog','app_prefs'];
@@ -1146,9 +1147,43 @@ function schedulePersistKV(k){
   clearTimeout(_persistTimer);
   _persistTimer=setTimeout(function(){ void flushPersistQueue(); },280);
 }
+function schedulePersistRetry(ms){
+  if(_dirtyKeys.size===0) return;
+  clearTimeout(_persistTimer);
+  _persistTimer=setTimeout(function(){ void flushPersistQueue(); },Math.max(450,Number(ms)||1500));
+}
+function limajeLocalEpoch(){
+  var e=Number(_kvCache.systemEpoch||0);
+  return isFinite(e)&&e>0?e:1;
+}
+async function limajeCloudEpoch(){
+  var sb=window.__limajeSupabase;
+  if(!sb) return limajeLocalEpoch();
+  try{
+    var r=await sb.from('limaje_kv').select('value,updated_at').eq('key','systemEpoch').limit(1).maybeSingle();
+    if(r&&r.error) return limajeLocalEpoch();
+    var v=r&&r.data&&Number(r.data.value);
+    return (isFinite(v)&&v>0)?v:1;
+  }catch(e){
+    return limajeLocalEpoch();
+  }
+}
 async function flushPersistQueue(){
   var sb=window.__limajeSupabase;
-  if(!sb||_dirtyKeys.size===0){ _persistTimer=null; return; }
+  if(_dirtyKeys.size===0){ _persistTimer=null; return; }
+  if(!sb){ _persistTimer=null; schedulePersistRetry(1800); return; }
+  // Guard anti-datos viejos: si nube tiene epoch más nuevo, no subir caché local antigua.
+  try{
+    var localEpoch=limajeLocalEpoch();
+    var cloudEpoch=await limajeCloudEpoch();
+    if(cloudEpoch>localEpoch){
+      _dirtyKeys.clear();
+      _persistTimer=null;
+      await hydrateFromSupabase();
+      scheduleRemoteUIRefresh();
+      return;
+    }
+  }catch(epErr){}
   var keys=Array.from(_dirtyKeys);
   _dirtyKeys.clear();
   _persistTimer=null;
@@ -1165,10 +1200,15 @@ async function flushPersistQueue(){
     if(r.error){
       console.error('limaje_kv persist',r.error);
       allowed.forEach(function(k){ _dirtyKeys.add(k); });
+      schedulePersistRetry(1800);
+    }else{
+      var stamp=Date.now();
+      allowed.forEach(function(k){ _kvUpdatedAt[k]=stamp; });
     }
   }catch(e){
     console.error(e);
     allowed.forEach(function(k){ _dirtyKeys.add(k); });
+    schedulePersistRetry(2200);
   }
 }
 async function persistFullLimajeState(){
@@ -1184,7 +1224,13 @@ async function persistFullLimajeState(){
 async function hydrateFromSupabase(){
   var sb=window.__limajeSupabase;
   if(!sb) return;
-  var r=await sb.from('limaje_kv').select('key,value');
+  var keysScope=LIMaje_PERSIST_KEYS.slice();
+  if(keysScope.indexOf('systemEpoch')<0) keysScope.push('systemEpoch');
+  var r=await sb.from('limaje_kv')
+    .select('key,value,updated_at')
+    .in('key',keysScope)
+    .order('updated_at',{ascending:true})
+    .order('key',{ascending:true});
   if(r.error){
     var em=(r.error.message||'')+' '+(r.error.code||'');
     var hint='';
@@ -1192,13 +1238,78 @@ async function hydrateFromSupabase(){
     if(/permission|rls|policy/i.test(em)) hint=' (ejecute schema.sql en Supabase y confirme que está logueado)';
     throw new Error(String(r.error.message||r.error)+hint);
   }
-  (r.data||[]).forEach(function(row){ _kvCache[row.key]=row.value; });
+  var latest=Object.create(null);
+  (r.data||[]).forEach(function(row){
+    if(!row||row.key==null) return;
+    var k=String(row.key);
+    var ts=row.updated_at?new Date(row.updated_at).getTime():0;
+    var prev=latest[k];
+    if(!prev || ts>=prev.ts) latest[k]={ ts:ts, value:row.value };
+  });
+  Object.keys(latest).forEach(function(k){
+    _kvCache[k]=latest[k].value;
+    _kvUpdatedAt[k]=latest[k].ts||Date.now();
+  });
+  if(!_kvCache.systemEpoch) _kvCache.systemEpoch=1;
 }
 function clearKvCache(){
   Object.keys(_kvCache).forEach(function(k){ delete _kvCache[k]; });
+  Object.keys(_kvUpdatedAt).forEach(function(k){ delete _kvUpdatedAt[k]; });
 }
 var _limajeRealtimeCh=null;
 var _remoteUiTimer=null;
+var _pollSyncTimer=null;
+var _pollSyncBusy=false;
+async function limajePollKvFromCloud(){
+  if(_pollSyncBusy) return;
+  var sb=window.__limajeSupabase;
+  if(!sb||!currentUser) return;
+  _pollSyncBusy=true;
+  try{
+    var keysScope=LIMaje_PERSIST_KEYS.slice();
+    if(keysScope.indexOf('systemEpoch')<0) keysScope.push('systemEpoch');
+    var r=await sb.from('limaje_kv')
+      .select('key,value,updated_at')
+      .in('key',keysScope)
+      .order('updated_at',{ascending:true})
+      .order('key',{ascending:true});
+    if(r.error) return;
+    var latest=Object.create(null);
+    (r.data||[]).forEach(function(row){
+      if(!row||row.key==null) return;
+      var k=String(row.key);
+      var ts=row.updated_at?new Date(row.updated_at).getTime():0;
+      var prevL=latest[k];
+      if(!prevL || ts>=prevL.ts) latest[k]={ ts:ts, value:row.value };
+    });
+    var changed=false;
+    Object.keys(latest).forEach(function(k){
+      var ts=latest[k].ts||0;
+      var prev=Number(_kvUpdatedAt[k]||0);
+      if(ts>=prev+1){
+        _kvCache[k]=latest[k].value;
+        _kvUpdatedAt[k]=ts||Date.now();
+        changed=true;
+      }
+    });
+    if(changed) scheduleRemoteUIRefresh();
+  }catch(e){
+  }finally{
+    _pollSyncBusy=false;
+  }
+}
+function startCloudSyncWatchers(){
+  stopCloudSyncWatchers();
+  _pollSyncTimer=setInterval(function(){ void limajePollKvFromCloud(); },6000);
+  document.addEventListener('visibilitychange',limajeOnVisibilitySync);
+}
+function stopCloudSyncWatchers(){
+  if(_pollSyncTimer){ clearInterval(_pollSyncTimer); _pollSyncTimer=null; }
+  document.removeEventListener('visibilitychange',limajeOnVisibilitySync);
+}
+function limajeOnVisibilitySync(){
+  if(document.visibilityState==='visible') void limajePollKvFromCloud();
+}
 function subscribeLimajeRealtime(){
   var sb=window.__limajeSupabase;
   if(!sb||_limajeRealtimeCh) return;
@@ -1206,8 +1317,14 @@ function subscribeLimajeRealtime(){
     _limajeRealtimeCh=sb.channel('limaje-kv-sync')
       .on('postgres_changes',{ event:'*', schema:'public', table:'limaje_kv' }, function(payload){
         if(payload.new&&payload.new.key!=null){
-          _kvCache[payload.new.key]=payload.new.value;
-          scheduleRemoteUIRefresh();
+          var k=payload.new.key;
+          var ts=payload.new.updated_at?new Date(payload.new.updated_at).getTime():Date.now();
+          var prev=Number(_kvUpdatedAt[k]||0);
+          if(ts>=prev){
+            _kvCache[k]=payload.new.value;
+            _kvUpdatedAt[k]=ts;
+            scheduleRemoteUIRefresh();
+          }
         }
       })
       .subscribe(function(status){
@@ -1257,6 +1374,8 @@ async function enterAppSessionOnce(session){
     document.getElementById('userLabel').textContent=currentUser.label;
     setupNav();
     subscribeLimajeRealtime();
+    startCloudSyncWatchers();
+    void limajePollKvFromCloud();
     void limajeAfterSessionDataLoaded();
     var nav0=getNavForUser();
     var land=(nav0[0]&&nav0[0].id)||'dashboard';
@@ -1289,6 +1408,7 @@ function exitAppSessionUI(){
     window.__limajeSupabase.removeChannel(_limajeRealtimeCh);
     _limajeRealtimeCh=null;
   }
+  stopCloudSyncWatchers();
   cart=[];
   currentUser=null;
   document.getElementById('app').style.display='none';
@@ -1697,6 +1817,7 @@ async function cotizConfiguradorPurgeAllCloud(){
 }
 
 function initData(){
+  if(!DB.get('systemEpoch')) DB.set('systemEpoch',1);
   if(!DB.get('categories')){
     DB.set('categories',[
       {id:1,name:'Cortes',parentId:null,code:'01'},
@@ -2339,10 +2460,41 @@ async function limajeResetSistemaConfigurador(){
     return;
   }
 
-  // 2) Reset local: vaciar todo lo persistido
+  // 2) Nueva época para invalidar cachés viejas en otros dispositivos
+  var newEpoch=Date.now();
+  DB.set('systemEpoch',newEpoch);
+  // 3) Reset atómico de KV en nube (obligatorio si hay nube activa)
+  var kvCloudRequired=!!window.__limajeSupabase;
+  var kvCloudOk=!kvCloudRequired;
+  try{
+    if(window.__limajeSupabase){
+      var LM2=window.__limajeSqlCore;
+      if(LM2&&typeof LM2.resetKvConfiguradorRpc==='function'){
+        var rkv=await LM2.resetKvConfiguradorRpc(newEpoch);
+        kvCloudOk=!!(rkv&&(rkv.ok===true||rkv.epoch));
+      }else{
+        // Fallback legacy
+        var sb2=window.__limajeSupabase;
+        await sb2.from('limaje_kv').delete().not('key','is',null);
+        var rw=await sb2.from('limaje_kv').upsert([{key:'systemEpoch',value:newEpoch,updated_at:new Date().toISOString()}],{onConflict:'key'});
+        kvCloudOk=!rw.error;
+      }
+    }
+  }catch(eKvAny){
+    console.warn(eKvAny);
+  }
+  if(kvCloudRequired && !kvCloudOk){
+    alert2('No se pudo resetear la base de sincronización (limaje_kv) en nube. Ejecute migration-sync-hardening.sql y vuelva a intentar.','error');
+    return;
+  }
+  // 4) Reset local: vaciar todo lo persistido
   try{
     LIMaje_PERSIST_KEYS.forEach(function(k){
-      try{ DB.set(k, (k==='schemaVersion')?DB.get('schemaVersion',null):null ); }catch(e0){}
+      try{
+        if(k==='schemaVersion') DB.set(k,DB.get('schemaVersion',null));
+        else if(k==='systemEpoch') DB.set(k,newEpoch);
+        else DB.set(k,null);
+      }catch(e0){}
     });
   }catch(e1){}
 
@@ -2373,8 +2525,13 @@ async function limajeResetSistemaConfigurador(){
     try{ await limajeRefreshCotizacionesFromSql(); }catch(xSql){}
     renderDashboard(); renderProducts(); renderInventario(); renderCaja(); renderMovimientos(); renderCartera(); renderDocumentosPage(); renderAuditoria(); renderTrabajadores(); renderCotizacionesList();
   }catch(e4){}
-  alert2('Sistema reseteado ✅','success');
+  alert2('Sistema reseteado ✅. Se cerrará sesión para aplicar limpieza total.', 'success');
   logAudit('reset_sistema','Reset completo por configurador','sistema',String(Date.now()));
+  try{
+    if(window.__limajeSupabase && window.__limajeSupabase.auth){
+      await window.__limajeSupabase.auth.signOut();
+    }
+  }catch(e5){}
 }
 function limajeOnPresenceRemote(){
   var bid=document.getElementById('cotizPresenceBanner');if(!bid)return;
@@ -7218,13 +7375,34 @@ window.__limajeBootPromise=bootLimajeApp();
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    var swUrl=new URL('sw.js',window.location.href).href;
+    var swUrl=new URL('sw.js?v=2026-04-08-01',window.location.href).href;
     var scopeUrl=new URL('./',window.location.href).href;
     navigator.serviceWorker.register(swUrl,{ scope:scopeUrl }).then(function(reg){
       console.log('LIMAJE PWA: service worker OK',reg.scope);
+      try{ reg.update(); }catch(e){}
+      if(reg.waiting){
+        try{ reg.waiting.postMessage({type:'SKIP_WAITING'}); }catch(e){}
+      }
+      reg.addEventListener('updatefound',function(){
+        var nw=reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange',function(){
+          if(nw.state==='installed' && navigator.serviceWorker.controller){
+            try{ nw.postMessage({type:'SKIP_WAITING'}); }catch(e){}
+          }
+        });
+      });
     }).catch(function(err){
       console.warn('LIMAJE PWA: service worker (opcional)',err);
     });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange',function(){
+    try{
+      if(!window.__limajeSwReloaded){
+        window.__limajeSwReloaded=1;
+        window.location.reload();
+      }
+    }catch(e){}
   });
 }
 </script>
