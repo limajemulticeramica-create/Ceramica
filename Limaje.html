@@ -4460,7 +4460,10 @@ function submitPayWorker(workerId,tipoPago){
   }
   logAudit('pago_trabajador',w.nombre+' — '+fmt(monto)+' — '+date+' ['+(tipoPago||'pago_libre')+']','trabajadores',workerId);
   closeModal(); renderTrabajadores(); alert2('Pago registrado y egreso creado en Caja','success');
-  if(tipoPago==='liquidacion'){ try{ generarComprobantePagoTrabajadorPDF(payRec,w); }catch(e){} }
+  if(tipoPago==='liquidacion'){
+    try{ generarComprobantePagoTrabajadorPDF(payRec,w); }
+    catch(e){ alert2('No se pudo generar PDF de liquidación: '+String((e&&e.message)||e),'error'); }
+  }
   void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
 }
 function openAdvanceWorker(id){
@@ -5697,8 +5700,8 @@ function generarComprobantePagoTrabajadorPDF(payRec, worker){
   if(!payRec || !worker) return;
   var JSPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
   if(!JSPDF) return alert2('jsPDF no cargó. Revise la conexión.','error');
-  pdfLoadLogo(function(logo){
-    try{
+  try{
+      var logo=pdfLogoBadgeDataUrl();
       var doc=new JSPDF({unit:'mm',format:'a4'});
       var M=14,W=182,y=11;
       doc.setDrawColor(175,175,175); doc.setLineWidth(0.25); doc.rect(M,y,W,278,'S');
@@ -5757,10 +5760,9 @@ function generarComprobantePagoTrabajadorPDF(payRec, worker){
       try{ renderDocumentosPage(); }catch(x){}
       alert2('PDF de liquidacion generado ✅');
       void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
-    }catch(err){
-      alert2('Error PDF liquidacion: '+String(err.message||err),'error');
-    }
-  });
+  }catch(err){
+    alert2('Error PDF liquidacion: '+String(err.message||err),'error');
+  }
 }
 function contabMonthRange(year,month){
   var mm=String(month).padStart(2,'0');
