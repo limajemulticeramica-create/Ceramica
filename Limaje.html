@@ -5095,7 +5095,8 @@ function pdfSuggestedFilename(tipo, refId){
 var PDF_EMPRESA_NOMBRE=LIMAJE_BRAND_COMPANY_NAME;
 var PDF_EMPRESA_EMAIL='multiceramicasanjuan@gmail.com';
 var PDF_EMPRESA_TEL='5453-3143';
-var PDF_BRAND_G=[46,125,50], PDF_BRAND_R=[198,40,40], PDF_BRAND_B=[21,101,192];
+// Paleta corporativa PDF: gris / negro / rojo
+var PDF_BRAND_G=[78,78,78], PDF_BRAND_R=[198,40,40], PDF_BRAND_B=[18,18,18];
 var _pdfLogoBadgeCache=null;
 function pdfBrandStripe(doc,x,y,h){
   var w=3.6, s=w/3;
@@ -5180,13 +5181,13 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   var M=14, W=182, y=11;
   var headerH=44;
   pdfBrandStripe(doc,M,y,headerH);
-  doc.setFillColor(248,251,249);
-  doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setFillColor(250,250,250);
+  doc.setDrawColor(70,70,70);
   doc.setLineWidth(0.4);
   doc.rect(M+5,y,W-5,headerH,'FD');
   pdfDrawLogo(doc,logoDataUrl,M+10,y+7,78,28);
   var tx=M+W-7;
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
   doc.setFont('helvetica','bold');
   doc.setFontSize(17);
   doc.text('COTIZACIÓN',tx,y+12.5,{align:'right'});
@@ -5194,7 +5195,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.setFontSize(8.4);
   doc.setTextColor(40,40,42);
   doc.text(PDF_EMPRESA_NOMBRE,tx,y+20.5,{align:'right'});
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(PDF_BRAND_G[0],PDF_BRAND_G[1],PDF_BRAND_G[2]);
   doc.text(PDF_EMPRESA_EMAIL,tx,y+27,{align:'right'});
   doc.setTextColor(55,65,60);
   doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+33,{align:'right'});
@@ -5204,12 +5205,12 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   y+=headerH+7;
 
   // Badge de referencia (moderno y visible)
-  doc.setFillColor(238,246,255);
-  doc.setDrawColor(178,205,236);
+  doc.setFillColor(245,245,245);
+  doc.setDrawColor(190,190,190);
   doc.roundedRect(M+W-62,y-1,62,10,2,2,'FD');
   doc.setFont('helvetica','bold');
   doc.setFontSize(9);
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
   doc.text('Ref. #'+q.id,M+W-4,y+5,{align:'right'});
 
   doc.setTextColor(30,30,30);
@@ -5223,12 +5224,12 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.text('Elaborado por: '+cotizElaboradoText(q),M,y+3);
   y+=8;
   doc.setFillColor(255,255,255);
-  doc.setDrawColor(PDF_BRAND_G[0],PDF_BRAND_G[1],PDF_BRAND_G[2]);
+  doc.setDrawColor(70,70,70);
   doc.setLineWidth(0.35);
   doc.roundedRect(M,y,W,24,2,2,'S');
-  doc.setFillColor(232,245,233);
+  doc.setFillColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.roundedRect(M,y,W,6,2,2,'F');
-  doc.setTextColor(PDF_BRAND_G[0],PDF_BRAND_G[1],PDF_BRAND_G[2]);
+  doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold');
   doc.setFontSize(9);
   doc.text('Datos del cliente',M+4,y+4.5);
@@ -5244,26 +5245,27 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   var subPrev=q.subtotal!=null?q.subtotal:cotizSubtotal();
   var totPrev=q.total!=null?q.total:Math.max(0,subPrev-(q.descuento||0));
   var cardY=y, cardH=18, leftW=104, gap=4, rightW=W-leftW-gap;
-  doc.setDrawColor(210,222,235);
-  doc.setFillColor(247,250,255);
+  doc.setDrawColor(205,205,205);
+  doc.setFillColor(248,248,248);
   doc.roundedRect(M,cardY,leftW,cardH,2,2,'FD');
-  doc.setFillColor(244,251,246);
-  doc.setDrawColor(188,221,198);
+  doc.setFillColor(248,248,248);
+  doc.setDrawColor(205,205,205);
   doc.roundedRect(M+leftW+gap,cardY,rightW,cardH,2,2,'FD');
   doc.setFont('helvetica','bold');
   doc.setFontSize(8.2);
-  doc.setTextColor(50,80,125);
+  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.text('Condiciones',M+3,cardY+4.5);
-  doc.setTextColor(PDF_BRAND_G[0],PDF_BRAND_G[1],PDF_BRAND_G[2]);
+  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
   doc.text('Resumen',M+leftW+gap+3,cardY+4.5);
   doc.setFont('helvetica','normal');
   doc.setFontSize(7.8);
   doc.setTextColor(60,66,72);
   doc.text('Fecha: '+dateLabel(q.date||today())+' · Estado: '+cotizEstadoLabel(q.status),M+3,cardY+9.5);
   doc.text('Elaborado: '+cotizElaboradoText(q),M+3,cardY+14);
-  doc.setTextColor(35,82,45);
+  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.text('Subtotal: Q '+Number(subPrev).toFixed(2),M+leftW+gap+3,cardY+9.5);
   doc.setFont('helvetica','bold');
+  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
   doc.text('Total: Q '+Number(totPrev).toFixed(2),M+leftW+gap+3,cardY+14);
   y+=cardH+6;
   if(q.nota){
@@ -5283,7 +5285,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   }
   doc.setTextColor(0,0,0);
   doc.setFontSize(9);
-  doc.setFillColor(33,90,153);
+  doc.setFillColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.roundedRect(M,y,W,8,1.5,1.5,'F');
   doc.setTextColor(255,255,255);
@@ -5319,14 +5321,14 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
     row++;
   });
   y+=5;
-  doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setDrawColor(70,70,70);
   doc.setLineWidth(0.6);
   doc.line(M,y,M+W,y); y+=7;
   var sub=q.subtotal!=null?q.subtotal:cotizSubtotal();
   var tot=q.total!=null?q.total:Math.max(0,cotizSubtotal()-(q.descuento||0));
   var boxL=M+95;
-  doc.setFillColor(248,252,249);
-  doc.setDrawColor(178,208,188);
+  doc.setFillColor(248,248,248);
+  doc.setDrawColor(200,200,200);
   doc.setLineWidth(0.35);
   var boxH=6+6+((q.descuento||0)>0?6:0)+10;
   doc.roundedRect(boxL,y-3,M+W-boxL-2,boxH,2,2,'FD');
@@ -5345,7 +5347,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   }
   doc.setFont('helvetica','bold');
   doc.setFontSize(12.5);
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
   doc.text('TOTAL',boxL+4,y+4);
   doc.text('Q '+Number(tot).toFixed(2),M+W-4,y+4,{align:'right'});
   doc.setFontSize(9);
@@ -5366,8 +5368,8 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   }
   // Bloque final profesional: validez y firmas
   if(y>246){ doc.addPage(); y=18; }
-  doc.setDrawColor(206,214,220);
-  doc.setFillColor(250,252,253);
+  doc.setDrawColor(210,210,210);
+  doc.setFillColor(249,249,249);
   doc.roundedRect(M,y,W,24,2,2,'FD');
   doc.setFont('helvetica','bold');
   doc.setFontSize(8.2);
@@ -5377,7 +5379,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.setFontSize(7.6);
   doc.text('Precios sujetos a disponibilidad por bodega y confirmación al momento de facturar.',M+3,y+11);
   var fy=y+20;
-  doc.setDrawColor(150,160,168);
+  doc.setDrawColor(120,120,120);
   doc.line(M+10,fy,M+80,fy);
   doc.line(M+102,fy,M+172,fy);
   doc.setFontSize(7.2);
