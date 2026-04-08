@@ -10,8 +10,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="San Juan">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="512x512" href="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png">
-<link rel="apple-touch-icon" href="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Multi-Cerámica San Juan — Sistema de Gestión v2.0</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
@@ -310,7 +311,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <!-- INTRODUCCIÓN / BIENVENIDA -->
 <div id="introScreen">
   <div class="intro-box">
-    <img src="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png" alt="Multi-Cerámica San Juan" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('introLogoFallback');if(t)t.style.display='block';">
+    <img src="Logo.png" alt="Multi-Cerámica San Juan" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('introLogoFallback');if(t)t.style.display='block';">
     <div id="introLogoFallback" style="display:none;font-size:22px;font-weight:700;color:#fff;text-align:center;padding:16px;">Multi-Cerámica San Juan</div>
     <div class="login-brand-sub">Sistema de Gestión</div>
     <div class="intro-title">Bienvenido</div>
@@ -326,7 +327,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">
-      <img src="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png" alt="Multi-Cerámica San Juan" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('loginLogoFallback');if(t)t.style.display='block';">
+      <img src="Logo.png" alt="Multi-Cerámica San Juan" class="login-logo-img" width="320" height="120" loading="eager" decoding="async" onerror="this.style.display='none';var t=document.getElementById('loginLogoFallback');if(t)t.style.display='block';">
       <div id="loginLogoFallback" style="display:none;font-size:20px;font-weight:700;color:var(--teal-dk);text-align:center;padding:12px;">Multi-Cerámica San Juan</div>
       <div class="login-brand-sub">Sistema de Gestión</div>
     </div>
@@ -345,7 +346,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
   <div class="topbar">
     <div class="topbar-brand">
       <div class="topbar-logo">
-        <img src="assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png" alt="Multi-Cerámica San Juan" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
+        <img src="Logo.png" alt="Multi-Cerámica San Juan" class="topbar-logo-img" width="120" height="45" loading="lazy" decoding="async">
       </div>
       <div class="topbar-name">
         <span class="topbar-name-script">Multi-Cerámica San Juan</span>
@@ -598,36 +599,46 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
       </div>
     </div>
 
-    <!-- COMPRAS -->
-    <div class="page" id="page-compras">
+    <!-- GASTOS OPERATIVOS -->
+    <div class="page" id="page-gastos-operativos">
       <div class="page-header">
-        <h2>🧾 Compras y costeo</h2>
+        <h2>📌 Gastos operativos del mes</h2>
       </div>
-
       <div class="card">
-        <div class="card-title">📌 Gastos operativos del mes</div>
         <p style="color:var(--text2);font-size:13px;margin-bottom:12px;">
           Estos gastos se prorratean por día para calcular el <strong>costo real</strong> de compras según el tipo:
           <strong>Inventario</strong> (días restantes del mes), <strong>Pend. abastecimiento</strong> (1 día), u <strong>Otros</strong> (días configurables).
         </p>
         <div class="grid-3" style="gap:10px;align-items:flex-end;">
           <div class="form-group" style="margin:0;"><label>Mes (YYYY-MM)</label><input type="month" id="opMes"></div>
-          <div class="form-group" style="margin:0;"><label>Días del mes</label><input type="number" id="opDiasMes" min="28" max="31" step="1"></div>
-          <div class="form-group" style="margin:0;"><label>Total gastos (Q)</label><input type="number" id="opTotal" min="0" step="0.01"></div>
+          <div class="form-group" style="margin:0;"><label>Días del mes</label><input type="number" id="opDiasMes" min="28" max="31" step="1" oninput="comprasOpInputChanged()"></div>
+          <div class="form-group" style="margin:0;"><label>Total gastos (Q)</label><input type="number" id="opTotal" min="0" step="0.01" oninput="comprasOpTotalManualChanged()"></div>
         </div>
         <div class="grid-3" style="gap:10px;margin-top:10px;">
-          <div class="form-group" style="margin:0;"><label>Internet</label><input type="number" id="opInternet" min="0" step="0.01"></div>
-          <div class="form-group" style="margin:0;"><label>Alquiler</label><input type="number" id="opAlquiler" min="0" step="0.01"></div>
-          <div class="form-group" style="margin:0;"><label>Luz</label><input type="number" id="opLuz" min="0" step="0.01"></div>
-          <div class="form-group" style="margin:0;"><label>Teléfono</label><input type="number" id="opTelefono" min="0" step="0.01"></div>
-          <div class="form-group" style="margin:0;"><label>Agua</label><input type="number" id="opAgua" min="0" step="0.01"></div>
-          <div class="form-group" style="margin:0;"><label>Salarios</label><input type="number" id="opSalarios" min="0" step="0.01"></div>
+          <div class="form-group" style="margin:0;"><label>Internet</label><input type="number" id="opInternet" min="0" step="0.01" oninput="comprasOpInputChanged()"></div>
+          <div class="form-group" style="margin:0;"><label>Alquiler</label><input type="number" id="opAlquiler" min="0" step="0.01" oninput="comprasOpInputChanged()"></div>
+          <div class="form-group" style="margin:0;"><label>Luz</label><input type="number" id="opLuz" min="0" step="0.01" oninput="comprasOpInputChanged()"></div>
+          <div class="form-group" style="margin:0;"><label>Teléfono</label><input type="number" id="opTelefono" min="0" step="0.01" oninput="comprasOpInputChanged()"></div>
+          <div class="form-group" style="margin:0;"><label>Agua</label><input type="number" id="opAgua" min="0" step="0.01" oninput="comprasOpInputChanged()"></div>
+          <div class="form-group" style="margin:0;"><label>Salarios</label><input type="number" id="opSalarios" min="0" step="0.01" oninput="comprasOpInputChanged()"></div>
         </div>
         <div id="opResumen" style="margin-top:12px;font-size:13px;"></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
           <button type="button" class="btn btn-success" onclick="comprasGuardarGastosOperativos()">Guardar gastos del mes</button>
           <button type="button" class="btn btn-secondary" onclick="comprasCargarGastosOperativos(true)">Recargar</button>
         </div>
+      </div>
+    </div>
+
+    <!-- COMPRAS -->
+    <div class="page" id="page-compras">
+      <div class="page-header">
+        <h2>🧾 Compras</h2>
+      </div>
+      <div class="card" style="background:var(--teal-xs);border-color:var(--border);">
+        <p style="margin:0;color:var(--text2);font-size:13px;">
+          El costeo usa los <strong>Gastos operativos</strong> del mes correspondiente. Si no los ve, vaya a <strong>📌 Gastos operativos</strong>.
+        </p>
       </div>
 
       <div class="card">
@@ -641,14 +652,14 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
               <option value="otros">Otros (días configurables)</option>
             </select>
           </div>
-          <div class="form-group" style="margin:0;"><label>Días a incluir (solo «Otros»)</label><input type="number" id="compDiasOtros" min="0" step="1" value="0" disabled></div>
+          <div class="form-group" style="margin:0;"><label>Días a incluir (solo «Otros»)</label><input type="number" id="compDiasOtros" min="0" step="1" value="0" disabled oninput="comprasRenderTotales()"></div>
         </div>
 
         <div class="grid-3" style="gap:10px;align-items:flex-end;margin-top:10px;">
           <div class="form-group" style="margin:0;"><label>Proveedor / nota</label><input type="text" id="compProveedor" placeholder="Opcional"></div>
           <div class="form-group" style="margin:0;"><label>No. factura / documento</label><input type="text" id="compFactura" placeholder="Opcional"></div>
           <div class="form-group" style="margin:0;"><label>Bodega</label>
-            <select id="compBodega">
+            <select id="compBodega" onchange="comprasOnBodegaChange()">
               <option value="LOCAL">Local</option>
               <option value="BOD1">Bodega 1</option>
               <option value="BOD2">Bodega 2</option>
@@ -679,6 +690,10 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
           <div class="card-title" style="margin-bottom:10px;">🧱 Líneas de compra</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
             <div class="form-group" style="margin:0;min-width:220px;flex:2;"><label>Producto (buscar)</label><input id="compBuscarProd" placeholder="Código o nombre..." autocomplete="off" oninput="comprasBuscarProductos()"></div>
+            <div class="form-group" style="margin:0;min-width:170px;flex:1;"><label>Lote destino</label>
+              <select id="compLineaLoteSel" onchange="comprasOnLoteSelChange()"><option value="">(Nuevo)</option></select>
+            </div>
+            <div class="form-group" style="margin:0;min-width:160px;flex:1;"><label>Código de lote</label><input id="compLineaLote" placeholder="Ej. 06 74"></div>
             <div class="form-group" style="margin:0;min-width:150px;flex:1;"><label>Modo</label>
               <select id="compLineaModo"><option value="cajas">Cajas</option><option value="m2">m²</option><option value="piezas">Piezas</option><option value="unidad">Unidad/Bolsa</option></select>
             </div>
@@ -811,6 +826,11 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
           <select id="movPago" onchange="renderMovimientos()">
             <option value="">Forma de pago</option>
             <option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option><option value="credito">Crédito</option>
+          </select>
+          <select id="movArchivo" onchange="renderMovimientos()">
+            <option value="activos">Activos</option>
+            <option value="archivados">Archivados</option>
+            <option value="todos">Todos</option>
           </select>
           <button class="btn btn-sm" onclick="renderMovimientos()">Filtrar</button>
         </div>
@@ -1100,8 +1120,8 @@ function limajeAssetUrl(rel){ try{ return new URL(rel||'',location.href).href; }
 // BRANDING (logo, nombre, favicon)
 // ============================================================
 const LIMAJE_BRAND_COMPANY_NAME='Multi-Cerámica San Juan';
-const LIMAJE_BRAND_LOGO_REL='assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-d691df0c-5f6a-4784-acbf-d240af81cbd5.png';
-const LIMAJE_BRAND_FAVICON_REL='assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png';
+const LIMAJE_BRAND_LOGO_REL='Logo.png';
+const LIMAJE_BRAND_FAVICON_REL='icon-192.png';
 
 const DB={
   get(k,def=null){
@@ -1401,6 +1421,14 @@ function addQtyToLots(pId,loc,qty,lotLabel){
     lots.push(lot);
   }
   lot.qty+=qty;
+  saveLots(lots);
+}
+/** Crea SIEMPRE un nuevo registro de lote (historial de ingresos). */
+function addLotEntry(pId,loc,qty,lotCode){
+  if((Number(qty)||0)<=STOCK_EPS) return;
+  var lots=getLots();
+  var label=String(lotCode||'').trim()||('COMPRA '+today());
+  lots.push({id:Date.now()+Math.floor(Math.random()*1e6),productId:pId,locationCode:loc,lotCode:label,qty:Number(qty)||0,receivedAt:Date.now()});
   saveLots(lots);
 }
 function deductLotsFIFO(pId,loc,qty){
@@ -1785,7 +1813,7 @@ const isAdmin=()=>currentUser&&(currentUser.role==='admin'||currentUser.role==='
 const NAV_ADMIN=[
   {id:'dashboard',label:'📊 Dashboard'},{id:'categorias',label:'🗂 Categorías'},
   {id:'ventas',label:'💰 Ventas'},{id:'cotizaciones',label:'📋 Cotizaciones'},{id:'cotiz-historial',label:'📊 Hist. cotiz.'},
-  {id:'inventario',label:'📦 Inventario'},{id:'compras',label:'🧾 Compras'},
+  {id:'inventario',label:'📦 Inventario'},{id:'gastos-operativos',label:'📌 Gastos operativos'},{id:'compras',label:'🧾 Compras'},
   {id:'cartera',label:'💳 Cartera'},{id:'caja',label:'🏦 Caja'},
   {id:'movimientos',label:'↔ Movimientos'},{id:'reportes',label:'📄 Reportes'},{id:'documentos',label:'📁 Documentos'},
   {id:'trabajadores',label:'👷 Trabajadores'},{id:'auditoria',label:'📋 Auditoría'},{id:'actividad-sql',label:'🔐 Act. servidor'},
@@ -1803,12 +1831,14 @@ const NAV_VENDEDOR=[
 ];
 const NAV_BODEGUERO=[
   {id:'dashboard',label:'📊 Dashboard'},
+  {id:'gastos-operativos',label:'📌 Gastos operativos'},
   {id:'compras',label:'🧾 Compras'},
   {id:'inventario',label:'📦 Inventario'},
   {id:'movimientos',label:'↔ Movimientos'},
 ];
 const NAV_AUX_BOD=[
   {id:'dashboard',label:'📊 Dashboard'},
+  {id:'gastos-operativos',label:'📌 Gastos operativos'},
   {id:'compras',label:'🧾 Compras'},
   {id:'inventario',label:'📦 Inventario'},
 ];
@@ -1863,6 +1893,7 @@ function navigateTo(id){
       }
     }
     if(id==='inventario'){void limajeRefreshStockMap();renderInventario();populateCatFilters();}
+    if(id==='gastos-operativos'){renderGastosOperativosPage();}
     if(id==='compras'){void limajeRefreshStockMap();renderComprasPage();}
     if(id==='cartera')renderCartera();
     if(id==='caja')renderCaja();
@@ -2054,10 +2085,50 @@ async function togglePeriodoCerrado(id, cerrado){
     var per=await window.__limajeSqlCore.fetchPeriodos();
     __limajePeriodoCerradoMap={};
     per.forEach(function(p){ __limajePeriodoCerradoMap[p.id]=!!p.cerrado; });
+    // Marcar movimientos como archivados/desarchivados según el período
+    try{
+      var pObj=(per||[]).find(function(x){ return String(x.id)===String(id); });
+      if(pObj) limajeApplyPeriodoArchivadoToMovements(pObj, cerrado);
+    }catch(eMov){ console.warn(eMov); }
     await limajeRefreshCotizacionesFromSql();
     renderPeriodosPage();
     alert2('Período actualizado','success');
   }catch(e){ alert2(String(e.message||e),'error'); }
+}
+
+function limajeApplyPeriodoArchivadoToMovements(pObj, cerrado){
+  if(!pObj) return;
+  var start=String(pObj.fecha_inicio||'').slice(0,10);
+  var end=String(pObj.fecha_fin||'').slice(0,10);
+  var key=String(pObj.periodo_key||'').trim() || (start&&start.length>=7?start.slice(0,7):'');
+  if(!start||!end) return;
+  var mvs=getMovements().slice();
+  var touched=0;
+  mvs.forEach(function(m){
+    var d=String(m.date||'').slice(0,10);
+    if(!d) return;
+    if(d<start || d>end) return;
+    if(cerrado){
+      if(!m.archivedPeriodId){
+        m.archivedPeriodId=pObj.id;
+        m.archivedKey=key;
+        m.archivedAt=Date.now();
+        touched++;
+      }
+    }else{
+      if(String(m.archivedPeriodId||'')===String(pObj.id)){
+        delete m.archivedPeriodId;
+        delete m.archivedKey;
+        delete m.archivedAt;
+        touched++;
+      }
+    }
+  });
+  if(touched){
+    DB.set('movements',mvs);
+    try{ renderMovimientos(); renderCaja(); renderArchivoContableResumen(); }catch(e){}
+    logAudit('periodo_archivo',(cerrado?'Archivar':'Reabrir')+' movimientos '+key+' ('+touched+')','periodos',String(pObj.id));
+  }
 }
 function renderArchivoContableResumen(){
   var el=document.getElementById('archivoContableResumen');
@@ -3726,14 +3797,17 @@ function renderMovimientos(){
   const to=valById('movTo')||'';
   const tipo=valById('movTipo')||'';
   const pago=valById('movPago')||'';
+  const arch=valById('movArchivo')||'activos';
   let filtered=mvs;
   if(!canSeeAllMovements())filtered=filtered.filter(m=>m.vendedor===currentUser.username);
+  if(arch==='activos') filtered=filtered.filter(m=>!m.archivedPeriodId);
+  else if(arch==='archivados') filtered=filtered.filter(m=>!!m.archivedPeriodId);
   if(from)filtered=filtered.filter(m=>m.date>=from);
   if(to)filtered=filtered.filter(m=>m.date<=to);
   if(tipo)filtered=filtered.filter(m=>m.type===tipo);
   if(pago)filtered=filtered.filter(m=>m.pago===pago);
   document.getElementById('movimientosTable').innerHTML=`<table>
-    <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>FEL</th><th>Pago</th><th>Monto</th><th>Vendedor</th>${canVoidMovement()?'<th>Acc.</th>':''}</tr></thead>
+    <thead><tr><th>#</th><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>FEL</th><th>Pago</th><th>Monto</th><th>Vendedor</th><th>Archivo</th>${canVoidMovement()?'<th>Acc.</th>':''}</tr></thead>
     <tbody>${filtered.slice().reverse().map(m=>`<tr>
       <td style="font-size:11px;color:var(--text2)">${m.id}</td>
       <td style="font-size:11px">${fmtDt(m.ts)}</td>
@@ -3743,6 +3817,7 @@ function renderMovimientos(){
       <td style="font-size:11px">${m.pago||m.categ||'—'}</td>
       <td class="${m.type==='egreso'?'monto-egreso':'monto-ingreso'}">${fmt(m.total)}</td>
       <td style="font-size:11px;color:var(--text2)">${m.vendedor||'—'}</td>
+      <td style="font-size:11px;color:var(--text2)">${m.archivedKey||(!m.archivedPeriodId?'—':'archivado')}</td>
       ${canVoidMovement()?`<td style="display:flex;gap:4px;flex-wrap:wrap;">
         <button class="btn btn-sm btn-danger" onclick="deleteMovement(${m.id})">Anular</button>
         ${m.type==='venta'?`<button class="btn btn-sm btn-secondary" onclick="verRecibo(${m.id})">🧾 Ver</button> <button class="btn btn-sm" onclick="generarReciboVentaPDF(${m.id})" title="PDF con logo">📄 PDF</button> <button class="btn btn-sm" onclick="printReceipt(${m.id},'ticket')">🖨</button>`:''}
@@ -6249,6 +6324,36 @@ function comprasOpTotalFromInputs(){
   var fields=['opInternet','opAlquiler','opLuz','opTelefono','opAgua','opSalarios'];
   return fields.reduce(function(s,id){ return s + (parseFloat(valById(id))||0); },0);
 }
+function comprasOpTotalManualChanged(){
+  var t=document.getElementById('opTotal');
+  if(t) t.dataset.manual='1';
+  comprasOpInputChanged(true);
+}
+function comprasOpInputChanged(forceKeepManual){
+  var diasEl=document.getElementById('opDiasMes');
+  var dias=parseInt(diasEl&&diasEl.value,10)||30;
+  var sum=comprasOpTotalFromInputs();
+  var totalEl=document.getElementById('opTotal');
+  var manual=totalEl && totalEl.dataset && totalEl.dataset.manual==='1';
+  if(totalEl){
+    // Si no es manual (o está vacío), autocompletar el total
+    var cur=totalEl.value===''?null:(parseFloat(totalEl.value)||0);
+    if(!manual || cur==null){
+      totalEl.value=String(sum.toFixed(2));
+      if(!forceKeepManual) totalEl.dataset.manual='0';
+    }
+  }
+  // Vista previa del resumen (sin guardar)
+  var mes=String(valById('opMes')||comprasMesKeyFromDateStr(today()));
+  var el=document.getElementById('opResumen');
+  if(el){
+    var daily=comprasCalcDaily((manual&&totalEl)?(parseFloat(totalEl.value)||0):sum,dias);
+    el.innerHTML='<div class="alert" style="background:var(--surface2);border-color:var(--border);color:var(--text);">'+
+      '<strong>Vista previa</strong> — Mes <strong>'+escapeHtml(mes)+'</strong> · Total '+fmt((manual&&totalEl)?(parseFloat(totalEl.value)||0):sum)+' · Diario '+fmt(daily)+' ('+dias+' días)'+
+      (manual?'<div style="font-size:11px;color:var(--text2);margin-top:6px;">Total en modo manual (si desea volver a automático, borre el campo “Total gastos”).</div>':'')+
+      '</div>';
+  }
+}
 function comprasRenderOpResumen(op){
   var el=document.getElementById('opResumen'); if(!el) return;
   if(!op){ el.innerHTML='<div class="alert alert-error">No hay gastos operativos guardados para este mes. Ingréselos arriba para que el costeo sea exacto.</div>'; return; }
@@ -6273,7 +6378,10 @@ function comprasCargarGastosOperativos(force){
   setN('opAgua',op&&op.items?op.items.agua:0);
   setN('opSalarios',op&&op.items?op.items.salarios:0);
   var totalEl=document.getElementById('opTotal');
-  if(totalEl) totalEl.value=(op&&op.total!=null)?op.total:comprasOpTotalFromInputs();
+  if(totalEl){
+    totalEl.value=(op&&op.total!=null)?op.total:comprasOpTotalFromInputs();
+    totalEl.dataset.manual='0';
+  }
   comprasRenderOpResumen(op);
 }
 function comprasGuardarGastosOperativos(){
@@ -6300,6 +6408,8 @@ function comprasOnTipoChange(){
   var t=valById('compTipo')||'inventario';
   var d=document.getElementById('compDiasOtros');
   if(d){ d.disabled=(t!=='otros'); if(t!=='otros') d.value=0; }
+  // Si es "otros" y el usuario dejó vacío, sugerir 1 día
+  if(d && !d.disabled && (String(d.value||'').trim()===''||Number(d.value)<0)) d.value=1;
   comprasRenderTotales();
 }
 function comprasExtraAdd(){
@@ -6351,6 +6461,38 @@ function comprasSelectProd(pid){
   var inp=document.getElementById('compBuscarProd');
   if(inp&&p) inp.value=(p.code?(''+p.code+' — '):'')+p.name;
   var res=document.getElementById('compBuscarResults'); if(res){ res.style.display='none'; res.innerHTML=''; }
+  comprasRefreshLotInputs();
+}
+
+function comprasGetExistingLotCodesForProduct(pid,loc){
+  var lots=getLots().filter(function(l){
+    return String(l.productId)===String(pid) && String(l.locationCode)===String(loc||'LOCAL');
+  });
+  var codes={};
+  lots.forEach(function(l){ if(l.lotCode!=null&&String(l.lotCode).trim()) codes[String(l.lotCode).trim()]=1; });
+  return Object.keys(codes).sort();
+}
+function comprasRefreshLotInputs(){
+  var pid=__comprasSelectedProdId;
+  var sel=document.getElementById('compLineaLoteSel');
+  var inp=document.getElementById('compLineaLote');
+  var loc=valById('compBodega')||'LOCAL';
+  if(!sel) return;
+  if(!pid){ sel.innerHTML='<option value="">(Nuevo)</option>'; if(inp) inp.value=''; return; }
+  var codes=comprasGetExistingLotCodesForProduct(pid,loc);
+  sel.innerHTML='<option value="">(Nuevo)</option>'+codes.map(function(c){ return '<option value="'+escapeHtmlLot(c)+'">'+escapeHtmlLot(c)+'</option>'; }).join('');
+  // sugerencia por defecto si está vacío
+  if(inp && !String(inp.value||'').trim()){
+    var fac=(valById('compFactura')||'').trim();
+    inp.value=fac?fac:('COMPRA '+(valById('compFecha')||today()));
+  }
+}
+function comprasOnBodegaChange(){ comprasRefreshLotInputs(); }
+function comprasOnLoteSelChange(){
+  var sel=document.getElementById('compLineaLoteSel');
+  var inp=document.getElementById('compLineaLote');
+  if(!sel||!inp) return;
+  if(sel.value) inp.value=sel.value;
 }
 
 function comprasLineaAddManual(){
@@ -6359,9 +6501,11 @@ function comprasLineaAddManual(){
   var mode=valById('compLineaModo')||'cajas';
   var qty=parseFloat(valById('compLineaQty'))||0;
   var unitCost=parseFloat(valById('compLineaCosto'))||0;
+  var lotCode=(valById('compLineaLote')||'').trim();
   if(!p) return alert2('Seleccione un producto desde la búsqueda','error');
   if(qty<=0) return alert2('Ingrese cantidad válida','error');
   if(unitCost<0) return alert2('Precio inválido','error');
+  if(lotCode.length>60) return alert2('Código de lote demasiado largo','error');
 
   var stockQty=qty;
   if(mode==='m2'){
@@ -6376,7 +6520,7 @@ function comprasLineaAddManual(){
     stockQty=qty;
   }
   if(stockQty<=STOCK_EPS) return alert2('Cantidad muy pequeña','error');
-  __comprasLineasTmp.push({ lineId:Date.now()+Math.random(), productId:p.id, code:p.code||'', name:p.name||'', qtyMode:mode, qty:qty, unitCost:unitCost, stockQty:stockQty });
+  __comprasLineasTmp.push({ lineId:Date.now()+Math.random(), productId:p.id, code:p.code||'', name:p.name||'', lotCode:lotCode, qtyMode:mode, qty:qty, unitCost:unitCost, stockQty:stockQty });
   comprasRenderLineas();
   comprasRenderTotales();
   var q=document.getElementById('compLineaQty'); if(q) q.value=1;
@@ -6389,12 +6533,14 @@ function comprasLineaRemove(lineId){
 function comprasRenderLineas(){
   var el=document.getElementById('compLineasTable'); if(!el) return;
   if(!__comprasLineasTmp.length){ el.innerHTML='<p style="color:var(--text2);font-size:13px;">Sin líneas. Busque un producto y pulse «Añadir línea».</p>'; return; }
-  el.innerHTML='<table><thead><tr><th>Producto</th><th>Modo</th><th>Cant.</th><th>Precio unit.</th><th>Ingresa a stock</th><th>Subtotal</th><th></th></tr></thead><tbody>'+
+  el.innerHTML='<table><thead><tr><th>Producto</th><th>Lote</th><th>Modo</th><th>Cant.</th><th>Precio unit.</th><th>Ingresa a stock</th><th>Subtotal</th><th></th></tr></thead><tbody>'+
     __comprasLineasTmp.map(function(l){
       var modeLab={cajas:'Cajas',m2:'m²',piezas:'Piezas',unidad:'Unidad'}[l.qtyMode]||l.qtyMode;
       var stockLab=(l.qtyMode==='cajas'||l.qtyMode==='m2'||l.qtyMode==='piezas')?(fmtStockCajas(l.stockQty)+' cj.'):(String(l.stockQty)+' un.');
       var sub=(Number(l.qty)||0)*(Number(l.unitCost)||0);
+      var lotLab=escapeHtmlLot(String(l.lotCode||'').trim()||'—');
       return '<tr><td><span style="font-size:11px;color:var(--text2)">'+escapeHtmlLot(l.code)+'</span><br><strong>'+escapeHtmlLot(l.name)+'</strong></td>'+
+        '<td style="font-size:12px;">'+lotLab+'</td>'+
         '<td>'+modeLab+'</td><td>'+escapeHtmlLot(String(l.qty))+'</td><td>'+fmt(l.unitCost)+'</td><td>'+stockLab+'</td><td><strong>'+fmt(sub)+'</strong></td>'+
         '<td><button class="btn btn-sm btn-danger" onclick="comprasLineaRemove(\''+String(l.lineId)+'\')">✕</button></td></tr>';
     }).join('')+'</tbody></table>';
@@ -6482,7 +6628,7 @@ async function comprasGuardarCompra(){
     var stockQty=Number(l.stockQty)||0;
     prods[pIdx].stockByLocation[loc]=(Number(prods[pIdx].stockByLocation[loc])||0)+stockQty;
     recomputeStockTotal(prods[pIdx]);
-    addQtyToLots(l.productId,loc,stockQty,('COMPRA '+fecha+(factura?(' '+factura):'')));
+    addLotEntry(l.productId,loc,stockQty,(String(l.lotCode||'').trim()||('COMPRA '+fecha+(factura?(' '+factura):''))));
     var realTotal=(alloc.baseTotals[idx]||0)+(alloc.perLineExtra[idx]||0)+(alloc.perLineOp[idx]||0);
     var realUnitCost=(stockQty>0)?(realTotal/stockQty):0;
     if(updateCost && realUnitCost>0){
@@ -6527,13 +6673,11 @@ async function comprasGuardarCompra(){
 
 function renderComprasPage(){
   var f=document.getElementById('compFecha'); if(f&&!f.value) f.value=today();
-  var mesEl=document.getElementById('opMes'); if(mesEl&&!mesEl.value) mesEl.value=comprasMesKeyFromDateStr(today());
-  var diasEl=document.getElementById('opDiasMes'); if(diasEl&&!diasEl.value) diasEl.value=comprasDaysInMonth(mesEl.value);
-  comprasCargarGastosOperativos(false);
   comprasOnTipoChange();
   comprasRenderExtras();
   comprasRenderLineas();
   comprasRenderTotales();
+  comprasRefreshLotInputs();
   var from=valById('comprasFrom')||'';
   var to=valById('comprasTo')||'';
   var list=getCompras().filter(function(c){ if(from&&c.fecha<from) return false; if(to&&c.fecha>to) return false; return true; });
@@ -6546,6 +6690,14 @@ function renderComprasPage(){
         '<td style="font-size:12px;">'+escapeHtmlLot(c.proveedor||'—')+'</td><td style="font-size:12px;">'+escapeHtmlLot(c.factura||'—')+'</td>'+
         '<td>'+escapeHtmlLot(LOC_LABELS[c.bodega]||c.bodega)+'</td><td>'+String((c.lineas||[]).length)+'</td><td><strong>'+fmt(c.total||0)+'</strong></td></tr>';
     }).join('')+'</tbody></table>';
+}
+
+function renderGastosOperativosPage(){
+  var mesEl=document.getElementById('opMes');
+  if(mesEl&&!mesEl.value) mesEl.value=comprasMesKeyFromDateStr(today());
+  var diasEl=document.getElementById('opDiasMes');
+  if(diasEl && !diasEl.value) diasEl.value=comprasDaysInMonth(mesEl?mesEl.value:comprasMesKeyFromDateStr(today()));
+  comprasCargarGastosOperativos(false);
 }
 bindLimajeAuthUi();
 window.__limajeBootPromise=bootLimajeApp();

@@ -14,13 +14,19 @@
   "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "./assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png",
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./assets/c__Users_Usuario_AppData_Roaming_Cursor_User_workspaceStorage_8246af5b74d04edd5577fdfc3e6d8555_images_image-08136c44-6689-437a-835d-5dd3d9e3045a.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
