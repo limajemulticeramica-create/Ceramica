@@ -1042,6 +1042,13 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
         </p>
         <button type="button" class="btn btn-danger" onclick="void limajeResetSistemaConfigurador()">🧹 Reset completo</button>
       </div>
+      <div class="card" id="limajeNumeracionCard" style="display:none;border-color:#f3c677;background:#fffaf1;">
+        <div class="card-title">🔢 Reiniciar numeración de documentos (súper admin)</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">
+          Reinicia a <strong>1</strong> la numeración de <strong>recibos/ventas</strong> y <strong>cotizaciones</strong>. Esta acción limpia únicamente los módulos de documentos para empezar de cero.
+        </p>
+        <button type="button" class="btn btn-amber" onclick="void limajeReiniciarNumeracionDocumentosConfigurador()">♻ Reiniciar numeración</button>
+      </div>
     </div>
 
     <!-- USUARIOS -->
@@ -2417,8 +2424,51 @@ async function guardarPrefsBloqueo(){
 }
 function limajeUpdateWipeCardVisibility(){
   var el=document.getElementById('limajeWipeTestDataCard');
-  if(!el) return;
-  el.style.display=(currentUser&&currentUser.role==='configurador')?'block':'none';
+  var el2=document.getElementById('limajeNumeracionCard');
+  var show=(currentUser&&currentUser.role==='configurador')?'block':'none';
+  if(el) el.style.display=show;
+  if(el2) el2.style.display=show;
+}
+async function limajeReiniciarNumeracionDocumentosConfigurador(){
+  if(!(currentUser&&currentUser.role==='configurador')){ alert2('Solo súper admin (configurador)','error'); return; }
+  if(!confirm('Reiniciar numeración de documentos.\n\nEsto limpiará ventas/movimientos, cartera, cotizaciones y documentos PDF registrados para comenzar desde 1.\n\n¿Desea continuar?')) return;
+  if(!confirm('Segunda confirmación: esta acción NO se puede deshacer.')) return;
+  var cloudOk=true;
+  try{
+    if(window.__limajeSupabase&&window.__limajeSqlCore){
+      try{
+        await window.__limajeSqlCore.purgeAllCotizacionesConfiguradorRpc();
+      }catch(eRpc){
+        cloudOk=false;
+        console.warn(eRpc);
+      }
+      if(!cloudOk){
+        try{
+          var sb=window.__limajeSupabase;
+          await sb.from('limaje_demanda_linea').delete().not('cotizacion_id','is',null);
+          var d2=await sb.from('limaje_cotizaciones').delete().not('id','is',null);
+          cloudOk=!d2.error;
+        }catch(e2){ cloudOk=false; console.warn(e2); }
+      }
+    }
+  }catch(e){
+    cloudOk=false;
+  }
+  if(window.__limajeSupabase && !cloudOk){
+    alert2('No se pudo reiniciar la numeración de cotizaciones en nube. Ejecute migration-purge-cotizaciones-configurador.sql y reintente.','error');
+    return;
+  }
+  DB.set('movements',[]);
+  DB.set('cartera',[]);
+  DB.set('cotizaciones',[]);
+  DB.set('documentosExportados',[]);
+  try{ cotHistOffset=0; }catch(e0){}
+  try{ cotizEditId=null; cotizLineas=[]; }catch(e1){}
+  try{ await persistFullLimajeState(); }catch(e3){}
+  try{ await limajeRefreshCotizacionesFromSql(); }catch(e4){}
+  try{ renderDashboard(); renderCaja(); renderMovimientos(); renderCartera(); renderCotizacionesList(); renderDocumentosPage(); }catch(e5){}
+  logAudit('reinicio_numeracion_documentos','Reinicio de numeración de ventas y cotizaciones','sistema',String(Date.now()));
+  alert2('Numeración reiniciada ✅ Nuevos documentos inician en 1.','success');
 }
 async function limajeResetSistemaConfigurador(){
   if(!(currentUser&&currentUser.role==='configurador')){ alert2('Solo súper admin (configurador)','error'); return; }
