@@ -881,6 +881,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
             <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
             <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
           </select></div>
+          <button type="button" class="btn btn-sm" onclick="generarReporteContableMensualPDF()">📘 PDF cierre mensual</button>
           <button type="button" class="btn btn-sm btn-danger" onclick="limpiarRegistroDocumentos()">Vaciar historial</button>
         </div>
         <div id="documentosGrouped"></div>
@@ -4439,7 +4440,8 @@ function submitPayWorker(workerId,tipoPago){
   const payId=nextMovementId();
   const payTs=nowTs();
   var monthKey=workerMonthKey(date);
-  payments.unshift({id:payId,workerId,workerName:w.nombre,monto,date,period,forma,monthKey,tipo:(tipoPago||'pago_libre'),registradoPor:(currentUser&&currentUser.username)});
+  var payRec={id:payId,workerId:workerId,workerName:w.nombre,monto:monto,date:date,period:period,forma:forma,monthKey:monthKey,tipo:(tipoPago||'pago_libre'),registradoPor:(currentUser&&currentUser.username),ts:payTs};
+  payments.unshift(payRec);
   DB.set('workerPayments',payments);
   const mvs=getMovements();
   var pref=(tipoPago==='adelanto'?'Adelanto':'Sueldo');
@@ -4458,6 +4460,7 @@ function submitPayWorker(workerId,tipoPago){
   }
   logAudit('pago_trabajador',w.nombre+' — '+fmt(monto)+' — '+date+' ['+(tipoPago||'pago_libre')+']','trabajadores',workerId);
   closeModal(); renderTrabajadores(); alert2('Pago registrado y egreso creado en Caja','success');
+  if(tipoPago==='liquidacion'){ try{ generarComprobantePagoTrabajadorPDF(payRec,w); }catch(e){} }
   void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
 }
 function openAdvanceWorker(id){
@@ -5180,7 +5183,7 @@ function pdfDateParts(){
 }
 function pdfSuggestedFilename(tipo, refId){
   var p=pdfDateParts();
-  var slug={cotizacion:'Cotizacion',venta:'ReciboVenta',compromiso:'CompromisoPago'}[tipo]||'Documento';
+  var slug={cotizacion:'Cotizacion',venta:'ReciboVenta',compromiso:'CompromisoPago',liquidacion_nomina:'LiquidacionNomina',cierre_contable:'CierreContable'}[tipo]||'Documento';
   return 'SAN_JUAN_'+p.ym+'_'+slug+'_'+refId+'.pdf';
 }
 var PDF_EMPRESA_NOMBRE=LIMAJE_BRAND_COMPANY_NAME;
@@ -5690,6 +5693,153 @@ function generarCompromisoPagoPDF(carteraId){
     }
   });
 }
+function generarComprobantePagoTrabajadorPDF(payRec, worker){
+  if(!payRec || !worker) return;
+  var JSPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+  if(!JSPDF) return alert2('jsPDF no cargó. Revise la conexión.','error');
+  pdfLoadLogo(function(logo){
+    try{
+      var doc=new JSPDF({unit:'mm',format:'a4'});
+      var M=14,W=182,y=11;
+      doc.setDrawColor(175,175,175); doc.setLineWidth(0.25); doc.rect(M,y,W,278,'S');
+      doc.setFillColor(20,20,20); doc.triangle(M,y,M+48,y,M+35,y+19,'F');
+      doc.setFillColor(95,95,95); doc.rect(M+48,y,W-48,6,'F');
+      pdfDrawLogo(doc,logo,M+6,y+6,34,14);
+      var tx=M+W-7;
+      doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(20,20,20);
+      doc.text('COMPROBANTE DE LIQUIDACION',tx,y+12.5,{align:'right'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.4); doc.setTextColor(70,70,70);
+      doc.text(PDF_EMPRESA_NOMBRE,tx,y+20,{align:'right'});
+      doc.text(PDF_EMPRESA_EMAIL,tx,y+26,{align:'right'});
+      doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+32,{align:'right'});
+      y+=45;
+
+      var c=workerCalcMonth(worker.id,payRec.monthKey||workerMonthKey(payRec.date));
+      doc.setFillColor(245,245,245); doc.setDrawColor(180,180,180); doc.roundedRect(M,y,W,24,2,2,'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
+      doc.text('Trabajador: '+String(worker.nombre||'—'),M+4,y+7);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(55,55,55);
+      doc.text('Mes: '+String(payRec.monthKey||workerMonthKey(payRec.date))+'  ·  Fecha pago: '+dateLabel(payRec.date||today()),M+4,y+13);
+      doc.text('Comprobante #: '+String(payRec.id||'—')+'  ·  Forma: '+String(payRec.forma||'Efectivo'),M+4,y+19);
+      y+=33;
+
+      doc.setFillColor(20,20,20); doc.roundedRect(M,y,W,8,1.5,1.5,'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text('Resumen nomina mensual',M+4,y+5.5); y+=11;
+      doc.setTextColor(30,30,30); doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      doc.text('Meta salarial mes:',M+4,y); doc.text(fmt(c.objetivo||0),M+W-4,y,{align:'right'}); y+=7;
+      doc.text('Adelantos acumulados:',M+4,y); doc.text(fmt(c.adelantos||0),M+W-4,y,{align:'right'}); y+=7;
+      doc.setFont('helvetica','bold');
+      doc.text('Liquidacion pagada:',M+4,y); doc.text(fmt(payRec.monto||0),M+W-4,y,{align:'right'}); y+=7;
+      doc.setFont('helvetica','normal');
+      doc.text('Total pagado mes:',M+4,y); doc.text(fmt(c.pagado||0),M+W-4,y,{align:'right'}); y+=7;
+      doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
+      doc.text('Saldo posterior:',M+4,y); doc.text(fmt(c.saldo||0),M+W-4,y,{align:'right'}); y+=12;
+
+      doc.setFont('helvetica','normal'); doc.setTextColor(70,70,70); doc.setFontSize(9);
+      var txt='Este documento deja constancia de liquidacion del periodo indicado y forma parte del control contable interno de '+PDF_EMPRESA_NOMBRE+'.';
+      var lines=doc.splitTextToSize(txt,W-8);
+      doc.text(lines,M+4,y); y+=lines.length*4.5+14;
+
+      if(y>250){ doc.addPage(); y=30; }
+      doc.setDrawColor(120,120,120);
+      doc.line(M+8,y,M+82,y); doc.line(M+100,y,M+174,y);
+      doc.setFontSize(8); doc.setTextColor(90,90,90);
+      doc.text('Firma trabajador',M+45,y+4,{align:'center'});
+      doc.text('Autorizacion empresa',M+137,y+4,{align:'center'});
+
+      doc.setFontSize(7.2); doc.setTextColor(95,100,98);
+      doc.text(PDF_EMPRESA_NOMBRE+'  ·  '+PDF_EMPRESA_EMAIL+'  ·  Tel. '+PDF_EMPRESA_TEL,M+W/2,283,{align:'center'});
+
+      var fn=pdfSuggestedFilename('liquidacion_nomina',payRec.id||Date.now());
+      doc.save(fn);
+      pdfRegistrarDocumento('liquidacion_nomina','Liquidacion trabajador #'+(payRec.id||''),fn,payRec.id,{ trabajador:worker.nombre, total:payRec.monto, monthKey:payRec.monthKey });
+      try{ renderDocumentosPage(); }catch(x){}
+      alert2('PDF de liquidacion generado ✅');
+      void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
+    }catch(err){
+      alert2('Error PDF liquidacion: '+String(err.message||err),'error');
+    }
+  });
+}
+function contabMonthRange(year,month){
+  var mm=String(month).padStart(2,'0');
+  var from=String(year)+'-'+mm+'-01';
+  var d=new Date(year,month,0);
+  var to=String(year)+'-'+mm+'-'+String(d.getDate()).padStart(2,'0');
+  return {from:from,to:to,key:String(year)+'-'+mm};
+}
+function contabGetMonthSnapshot(year,month){
+  var rg=contabMonthRange(year,month);
+  var mvs=getMovements().filter(function(m){ var d=String(m.date||''); return d>=rg.from && d<=rg.to; });
+  var cot=getCotizaciones().filter(function(c){ var d=String(c.date||c.fecha||''); return d>=rg.from && d<=rg.to; });
+  var op=(DB.get('gastosOperativosMes',{})||{})[rg.key]||null;
+  var ventas=mvs.filter(function(m){ return m.type==='venta'; }).reduce(function(s,m){ return s+(Number(m.total)||0); },0);
+  var ingresos=mvs.filter(function(m){ return m.type==='ingreso'; }).reduce(function(s,m){ return s+(Number(m.total)||0); },0);
+  var abonos=mvs.filter(function(m){ return m.type==='abono'; }).reduce(function(s,m){ return s+(Number(m.total)||0); },0);
+  var egresos=mvs.filter(function(m){ return m.type==='egreso'; }).reduce(function(s,m){ return s+(Number(m.total)||0); },0);
+  return { range:rg, mvs:mvs, cotizaciones:cot, gastos:op, totalVentas:ventas, totalIngresos:ingresos, totalAbonos:abonos, totalEgresos:egresos, neto:(ventas+ingresos+abonos-egresos) };
+}
+function generarReporteContableMensualPDF(){
+  var y=parseInt(valById('docYearFilter'),10)||pdfDateParts().y;
+  var m=parseInt(valById('docMonthFilter'),10)||pdfDateParts().m;
+  var snap=contabGetMonthSnapshot(y,m);
+  var JSPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+  if(!JSPDF) return alert2('jsPDF no cargó. Revise la conexión.','error');
+  pdfLoadLogo(function(logo){
+    try{
+      var doc=new JSPDF({unit:'mm',format:'a4'});
+      var M=14,W=182,y0=11;
+      doc.setDrawColor(175,175,175); doc.setLineWidth(0.25); doc.rect(M,y0,W,278,'S');
+      doc.setFillColor(20,20,20); doc.triangle(M,y0,M+48,y0,M+35,y0+19,'F');
+      doc.setFillColor(95,95,95); doc.rect(M+48,y0,W-48,6,'F');
+      pdfDrawLogo(doc,logo,M+6,y0+6,34,14);
+      var tx=M+W-7;
+      doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(20,20,20);
+      doc.text('CIERRE CONTABLE MENSUAL',tx,y0+12.5,{align:'right'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.4); doc.setTextColor(70,70,70);
+      doc.text(PDF_EMPRESA_NOMBRE,tx,y0+20,{align:'right'});
+      doc.text('Periodo: '+snap.range.key,tx,y0+26,{align:'right'});
+      doc.text('Emitido: '+dateLabel(today()),tx,y0+32,{align:'right'});
+      var y=y0+47;
+
+      doc.setFillColor(20,20,20); doc.roundedRect(M,y,W,8,1.5,1.5,'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text('Resumen financiero del mes',M+4,y+5.5); y+=11;
+      doc.setTextColor(30,30,30); doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      doc.text('Ventas:',M+4,y); doc.text(fmt(snap.totalVentas),M+W-4,y,{align:'right'}); y+=7;
+      doc.text('Otros ingresos:',M+4,y); doc.text(fmt(snap.totalIngresos),M+W-4,y,{align:'right'}); y+=7;
+      doc.text('Abonos cartera:',M+4,y); doc.text(fmt(snap.totalAbonos),M+W-4,y,{align:'right'}); y+=7;
+      doc.text('Egresos:',M+4,y); doc.text(fmt(snap.totalEgresos),M+W-4,y,{align:'right'}); y+=7;
+      doc.setFont('helvetica','bold'); doc.text('Neto del mes:',M+4,y); doc.text(fmt(snap.neto),M+W-4,y,{align:'right'}); y+=11;
+
+      doc.setFont('helvetica','normal');
+      doc.text('Movimientos registrados: '+snap.mvs.length,M+4,y); y+=6;
+      doc.text('Cotizaciones del mes: '+snap.cotizaciones.length,M+4,y); y+=6;
+      var gt=(snap.gastos&&Number(snap.gastos.total))||0;
+      doc.text('Gastos operativos del mes: '+fmt(gt),M+4,y); y+=10;
+      if(snap.gastos && Array.isArray(snap.gastos.items) && snap.gastos.items.length){
+        doc.setFont('helvetica','bold'); doc.text('Detalle gastos operativos:',M+4,y); y+=6; doc.setFont('helvetica','normal');
+        snap.gastos.items.slice(0,14).forEach(function(it){
+          if(y>267){ doc.addPage(); y=16; }
+          var nom=String(it.nombre||it.name||'Item');
+          var val=Number(it.valor||it.amount||0);
+          doc.text('- '+nom,M+6,y); doc.text(fmt(val),M+W-4,y,{align:'right'}); y+=5;
+        });
+      }
+      doc.setFontSize(7.2); doc.setTextColor(95,100,98);
+      doc.text(PDF_EMPRESA_NOMBRE+'  ·  '+PDF_EMPRESA_EMAIL+'  ·  Tel. '+PDF_EMPRESA_TEL,M+W/2,283,{align:'center'});
+      var fn=pdfSuggestedFilename('cierre_contable',snap.range.key);
+      doc.save(fn);
+      pdfRegistrarDocumento('cierre_contable','Cierre contable mensual '+snap.range.key,fn,snap.range.key,{ totalNeto:snap.neto, movimientos:snap.mvs.length, cotizaciones:snap.cotizaciones.length, gastosOperativos:gt });
+      try{ renderDocumentosPage(); }catch(x){}
+      alert2('PDF de cierre contable generado ✅');
+      void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
+    }catch(err){
+      alert2('Error PDF cierre mensual: '+String(err.message||err),'error');
+    }
+  });
+}
 function renderDocumentosPage(){
   var el=document.getElementById('documentosGrouped'); if(!el) return;
   var arr=DB.get('documentosExportados',[]);
@@ -5721,7 +5871,10 @@ function renderDocumentosPage(){
     var label=pm[0]+' — '+mesNom[parseInt(pm[1],10)];
     return '<div style="margin-bottom:20px;"><div style="font-weight:700;color:var(--teal-dk);border-bottom:2px solid var(--border);padding-bottom:8px;margin-bottom:10px;">📂 '+label+'</div><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Nombre de archivo sugerido</th></tr></thead><tbody>'+
       byMonth[k].map(function(r){
-        var tipoLab=r.tipo==='cotizacion'?'Cotización':(r.tipo==='compromiso'?'Compromiso pago':'Recibo venta');
+        var tipoLab=r.tipo==='cotizacion'?'Cotización':
+          (r.tipo==='compromiso'?'Compromiso pago':
+          (r.tipo==='liquidacion_nomina'?'Liquidación nómina':
+          (r.tipo==='cierre_contable'?'Cierre contable mensual':'Recibo venta')));
         var det=r.titulo||'—';
         if(r.extra&&r.extra.cliente) det+=' · '+(r.extra.cliente||'');
         return '<tr><td style="font-size:11px;white-space:nowrap;">'+fmtDt(r.ts)+'</td><td>'+tipoLab+'</td><td style="font-size:12px;">'+escapeHtmlLot(det)+'</td><td style="font-size:11px;font-family:ui-monospace,monospace;">'+escapeHtmlLot(r.nombreArchivo)+'</td></tr>';
