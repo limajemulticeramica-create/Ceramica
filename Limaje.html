@@ -2429,10 +2429,27 @@ function limajeUpdateWipeCardVisibility(){
   if(el) el.style.display=show;
   if(el2) el2.style.display=show;
 }
+async function limajeCloudUpsertKvPatch(patchMap){
+  var sb=window.__limajeSupabase;
+  if(!sb) return {ok:false,error:'Sin conexión Supabase'};
+  var keys=Object.keys(patchMap||{});
+  if(!keys.length) return {ok:true};
+  var nowIso=new Date().toISOString();
+  var rows=keys.map(function(k){ return { key:k, value:patchMap[k], updated_at:nowIso }; });
+  try{
+    var r=await sb.from('limaje_kv').upsert(rows,{ onConflict:'key' });
+    if(r&&r.error) return {ok:false,error:r.error};
+    return {ok:true};
+  }catch(e){
+    return {ok:false,error:e};
+  }
+}
 async function limajeReiniciarNumeracionDocumentosConfigurador(){
   if(!(currentUser&&currentUser.role==='configurador')){ alert2('Solo súper admin (configurador)','error'); return; }
   if(!confirm('Reiniciar numeración de documentos.\n\nEsto limpiará ventas/movimientos, cartera, cotizaciones y documentos PDF registrados para comenzar desde 1.\n\n¿Desea continuar?')) return;
   if(!confirm('Segunda confirmación: esta acción NO se puede deshacer.')) return;
+  var newEpoch=Date.now();
+  DB.set('systemEpoch',newEpoch);
   var cloudOk=true;
   try{
     if(window.__limajeSupabase&&window.__limajeSqlCore){
@@ -2464,11 +2481,26 @@ async function limajeReiniciarNumeracionDocumentosConfigurador(){
   DB.set('documentosExportados',[]);
   try{ cotHistOffset=0; }catch(e0){}
   try{ cotizEditId=null; cotizLineas=[]; }catch(e1){}
+  var cloudKvOk=true;
+  try{
+    if(window.__limajeSupabase){
+      var kvPatch={
+        systemEpoch:newEpoch,
+        movements:[],
+        cartera:[],
+        cotizaciones:[],
+        documentosExportados:[]
+      };
+      var kvRes=await limajeCloudUpsertKvPatch(kvPatch);
+      cloudKvOk=!!kvRes.ok;
+      if(!cloudKvOk) console.warn('limaje numeracion kv patch',kvRes.error);
+    }
+  }catch(eKv){ cloudKvOk=false; console.warn(eKv); }
   try{ await persistFullLimajeState(); }catch(e3){}
   try{ await limajeRefreshCotizacionesFromSql(); }catch(e4){}
   try{ renderDashboard(); renderCaja(); renderMovimientos(); renderCartera(); renderCotizacionesList(); renderDocumentosPage(); }catch(e5){}
   logAudit('reinicio_numeracion_documentos','Reinicio de numeración de ventas y cotizaciones','sistema',String(Date.now()));
-  alert2('Numeración reiniciada ✅ Nuevos documentos inician en 1.','success');
+  alert2(cloudKvOk?'Numeración reiniciada ✅ Nuevos documentos inician en 1.':'Numeración reiniciada en este dispositivo. Si otro equipo no refleja, cierre sesión y reingrese.','success');
 }
 async function limajeResetSistemaConfigurador(){
   if(!(currentUser&&currentUser.role==='configurador')){ alert2('Solo súper admin (configurador)','error'); return; }
@@ -2533,10 +2565,7 @@ async function limajeResetSistemaConfigurador(){
   }catch(eKvAny){
     console.warn(eKvAny);
   }
-  if(kvCloudRequired && !kvCloudOk){
-    alert2('No se pudo resetear la base de sincronización (limaje_kv) en nube. Ejecute migration-sync-hardening.sql y vuelva a intentar.','error');
-    return;
-  }
+  // No abortar aquí: aplicamos fallback por upsert de estado limpio.
   // 4) Reset local: vaciar todo lo persistido
   try{
     LIMaje_PERSIST_KEYS.forEach(function(k){
@@ -2568,6 +2597,20 @@ async function limajeResetSistemaConfigurador(){
   try{ cotHistOffset=0; }catch(e0){}
   try{ cotizEditId=null; cotizLineas=[]; }catch(e1){}
 
+  var kvFallbackOk=true;
+  try{
+    if(window.__limajeSupabase && !kvCloudOk){
+      var cleanMap={ systemEpoch:newEpoch };
+      LIMaje_PERSIST_KEYS.forEach(function(k){
+        if(k==='schemaVersion') cleanMap[k]=DB.get('schemaVersion',null);
+        else if(k==='systemEpoch') cleanMap[k]=newEpoch;
+        else cleanMap[k]=DB.get(k,null);
+      });
+      var kvRes=await limajeCloudUpsertKvPatch(cleanMap);
+      kvFallbackOk=!!kvRes.ok;
+      if(!kvFallbackOk) console.warn('limaje reset kv fallback',kvRes.error);
+    }
+  }catch(eKvF){ kvFallbackOk=false; console.warn(eKvF); }
   try{ await persistFullLimajeState(); }catch(e2){}
   try{ await limajeRefreshStockMap(); }catch(e3){}
   try{
@@ -2575,7 +2618,7 @@ async function limajeResetSistemaConfigurador(){
     try{ await limajeRefreshCotizacionesFromSql(); }catch(xSql){}
     renderDashboard(); renderProducts(); renderInventario(); renderCaja(); renderMovimientos(); renderCartera(); renderDocumentosPage(); renderAuditoria(); renderTrabajadores(); renderCotizacionesList();
   }catch(e4){}
-  alert2('Sistema reseteado ✅. Se cerrará sesión para aplicar limpieza total.', 'success');
+  alert2((kvCloudOk||kvFallbackOk)?'Sistema reseteado ✅. Se cerrará sesión para aplicar limpieza total.':'Reseteado localmente. Hubo problema de nube; vuelva a intentar con buena conexión.', 'success');
   logAudit('reset_sistema','Reset completo por configurador','sistema',String(Date.now()));
   try{
     if(window.__limajeSupabase && window.__limajeSupabase.auth){
