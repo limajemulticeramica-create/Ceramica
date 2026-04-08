@@ -164,7 +164,10 @@
   .receipt-title{text-align:center;font-size:14px;font-weight:bold;}
   .receipt-sub{text-align:center;font-size:11px;margin-bottom:7px;color:#666;}
   .receipt hr{border:1px dashed #aaa;margin:6px 0;}
-  .receipt-row{display:flex;justify-content:space-between;margin:2px 0;font-size:11px;}
+  .receipt-row{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin:2px 0;font-size:11px;}
+  .receipt-row span{overflow-wrap:anywhere;word-break:break-word;}
+  .receipt-row span:first-child{flex:1;min-width:0;}
+  .receipt-row span:last-child{flex:0 0 42%;text-align:right;white-space:normal;}
   .receipt-total{font-weight:bold;font-size:13px;}
 
   .low-stock td{background:rgba(224,82,82,0.04);}
@@ -260,6 +263,10 @@
     .topbar-name-script{font-size:14px;}
     .topbar-name-sub{display:none;}
     .nav-tab{font-size:11px;padding:6px 8px;}
+    .modal-actions{flex-wrap:wrap;justify-content:stretch;}
+    .modal-actions .btn{flex:1 1 160px;justify-content:center;}
+    .table-wrap{-webkit-overflow-scrolling:touch;}
+    #saleCartTable table,#cotizLineasTable table,#inventarioTable table,#movimientosTable table,#carteraTable table,#workersTable table,#workerPaymentsTable table{min-width:700px;}
   }
   @media(max-width:540px){
     .content{padding:8px;}
@@ -3413,15 +3420,15 @@ function buildReceiptHTML(mov,mode){
     var sub=ventaItemSubtotalStored(i);
     var lotStr='';
     if(i.fifoLotes&&i.fifoLotes.length){
-      lotStr='<div style="font-size:'+(isA4?'8.5pt':'7.5pt')+';color:#555;margin-top:2px;line-height:1.35;">Lote(s): '+i.fifoLotes.map(function(f){
+      lotStr='<div style="font-size:'+(isA4?'8.5pt':'7.5pt')+';color:#555;margin-top:2px;line-height:1.35;white-space:normal;word-break:break-word;overflow-wrap:anywhere;">Lote(s): '+i.fifoLotes.map(function(f){
         var ing=f.ingreso?(' · ing. '+new Date(f.ingreso).toLocaleDateString('es-GT')):'';
         return escapeHtmlLot(String(f.lotCode||'—'))+' '+fmtStockCajas(f.cajas)+' cj.'+ing;
       }).join(' · ')+'</div>';
     }
     return `
     <div class="receipt-row">
-      <span style="flex:1;padding-right:4px;">${i.name}${i.code?' ('+i.code+')':''}${i.locationCode?' · '+limajeLocLabelDisplay(i.locationCode):''}${lotStr}</span>
-      <span style="white-space:nowrap;">${cant} × ${fmt(pu)} = ${fmt(sub)}</span>
+      <span style="flex:1;min-width:0;padding-right:4px;white-space:normal;word-break:break-word;overflow-wrap:anywhere;">${i.name}${i.code?' ('+i.code+')':''}${i.locationCode?' · '+limajeLocLabelDisplay(i.locationCode):''}${lotStr}</span>
+      <span style="flex:0 0 42%;text-align:right;white-space:normal;word-break:break-word;">${cant} × ${fmt(pu)} = ${fmt(sub)}</span>
     </div>`;
   }).join('');
   const subtotal=(mov.items||[]).reduce(function(s,i){ return s+ventaItemSubtotalStored(i); },0);
@@ -5298,9 +5305,22 @@ function pdfForceDownload(doc, fileName){
   }
   return ok;
 }
+function pdfGetLogoDataUrlSync(){
+  try{
+    var img=document.querySelector('.topbar-logo-img')||document.querySelector('.login-logo-img');
+    if(img && img.complete && img.naturalWidth>0){
+      var c=document.createElement('canvas');
+      c.width=img.naturalWidth; c.height=img.naturalHeight;
+      var g=c.getContext('2d');
+      g.drawImage(img,0,0);
+      return c.toDataURL('image/png');
+    }
+  }catch(e){}
+  return pdfLogoBadgeDataUrl();
+}
 function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   var M=14, W=182, y=11;
-  var headerH=44;
+  var headerH=58;
   // Marco principal y estilo moderno (negro/gris)
   doc.setDrawColor(175,175,175);
   doc.setLineWidth(0.25);
@@ -5316,23 +5336,25 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.setFillColor(95,95,95);
   doc.rect(M,286,W-70,3,'F');
 
-  pdfDrawLogo(doc,logoDataUrl,M+6,y+6,34,14);
-  var tx=M+W-7;
+  var logoW=102, logoH=30;
+  var logoX=M+(W-logoW)/2;
+  pdfDrawLogo(doc,logoDataUrl,logoX,y+8,logoW,logoH);
+  var tx=M+W/2;
   doc.setTextColor(25,25,25);
   doc.setFont('helvetica','bold');
-  doc.setFontSize(18);
-  doc.text('COTIZACIÓN',tx,y+12.5,{align:'right'});
+  doc.setFontSize(17);
+  doc.text('COTIZACIÓN',tx,y+42,{align:'center'});
   doc.setFont('helvetica','normal');
   doc.setFontSize(8.2);
   doc.setTextColor(80,80,80);
-  doc.text(PDF_EMPRESA_NOMBRE,tx,y+20.5,{align:'right'});
+  doc.text(PDF_EMPRESA_NOMBRE,tx,y+48,{align:'center'});
   doc.setTextColor(60,60,60);
-  doc.text(PDF_EMPRESA_EMAIL,tx,y+27,{align:'right'});
+  doc.text(PDF_EMPRESA_EMAIL,tx,y+53,{align:'center'});
   doc.setTextColor(55,65,60);
-  doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+33,{align:'right'});
+  doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+58,{align:'center'});
   doc.setFontSize(7);
   doc.setTextColor(100,110,105);
-  doc.text('Cotización comercial · No constituye factura fiscal (FEL)',tx,y+40,{align:'right'});
+  doc.text('Cotización comercial · No constituye factura fiscal (FEL)',tx,y+63,{align:'center'});
   y+=headerH+7;
 
   // Badge de referencia (moderno y visible)
@@ -5725,21 +5747,23 @@ function generarComprobantePagoTrabajadorPDF(payRec, worker){
   var JSPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
   if(!JSPDF) return alert2('jsPDF no cargó. Revise la conexión.','error');
   try{
-      var logo=pdfLogoBadgeDataUrl();
+      var logo=pdfGetLogoDataUrlSync();
       var doc=new JSPDF({unit:'mm',format:'a4'});
       var M=14,W=182,y=11;
       doc.setDrawColor(175,175,175); doc.setLineWidth(0.25); doc.rect(M,y,W,278,'S');
       doc.setFillColor(20,20,20); doc.triangle(M,y,M+48,y,M+35,y+19,'F');
       doc.setFillColor(95,95,95); doc.rect(M+48,y,W-48,6,'F');
-      pdfDrawLogo(doc,logo,M+6,y+6,34,14);
-      var tx=M+W-7;
+      var logoW=102, logoH=30;
+      var logoX=M+(W-logoW)/2;
+      pdfDrawLogo(doc,logo,logoX,y+8,logoW,logoH);
+      var tx=M+W/2;
       doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(20,20,20);
-      doc.text('COMPROBANTE DE LIQUIDACION',tx,y+12.5,{align:'right'});
+      doc.text('COMPROBANTE DE LIQUIDACION',tx,y+42,{align:'center'});
       doc.setFont('helvetica','normal'); doc.setFontSize(8.4); doc.setTextColor(70,70,70);
-      doc.text(PDF_EMPRESA_NOMBRE,tx,y+20,{align:'right'});
-      doc.text(PDF_EMPRESA_EMAIL,tx,y+26,{align:'right'});
-      doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+32,{align:'right'});
-      y+=45;
+      doc.text(PDF_EMPRESA_NOMBRE,tx,y+48,{align:'center'});
+      doc.text(PDF_EMPRESA_EMAIL,tx,y+53,{align:'center'});
+      doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+58,{align:'center'});
+      y+=66;
 
       var c=workerCalcMonth(worker.id,payRec.monthKey||workerMonthKey(payRec.date));
       doc.setFillColor(245,245,245); doc.setDrawColor(180,180,180); doc.roundedRect(M,y,W,24,2,2,'FD');
