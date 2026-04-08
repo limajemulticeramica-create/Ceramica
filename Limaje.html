@@ -1092,7 +1092,7 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 var _kvCache=Object.create(null);
 var _persistTimer=null;
 var _dirtyKeys=new Set();
-var LIMaje_PERSIST_KEYS=['categories','products','movements','cartera','cajaCierres','locations','inventoryLots','cotizaciones','documentosExportados','auditLog','workers','workerPayments','schemaVersion','app_prefs','compras','gastosOperativosMes'];
+var LIMaje_PERSIST_KEYS=['categories','products','movements','cartera','cajaCierres','locations','inventoryLots','cotizaciones','documentosExportados','auditLog','workers','workerPayments','workerMonthLedger','schemaVersion','app_prefs','compras','gastosOperativosMes'];
 function getKvWritableKeysForRole(role){
   if(role==='admin'||role==='contador'||role==='configurador') return LIMaje_PERSIST_KEYS.slice();
   if(role==='vendedor') return ['movements','cartera','products','inventoryLots','locations','cotizaciones','documentosExportados','auditLog','app_prefs'];
@@ -1716,6 +1716,7 @@ function initData(){
   if(!DB.get('auditLog'))DB.set('auditLog',[]);
   if(!DB.get('workers'))DB.set('workers',[]);
   if(!DB.get('workerPayments'))DB.set('workerPayments',[]);
+  if(!DB.get('workerMonthLedger'))DB.set('workerMonthLedger',[]);
 }
 
 // ============================================================
@@ -1945,6 +1946,7 @@ function getCartera(){return DB.get('cartera',[]);}
 function getAuditLog(){return DB.get('auditLog',[]);}
 function getWorkers(){return DB.get('workers',[]);}
 function getWorkerPayments(){return DB.get('workerPayments',[]);}
+function getWorkerMonthLedger(){ return DB.get('workerMonthLedger',[]); }
 function getCotizaciones(){return DB.get('cotizaciones',[]);}
 var __limajeStockResMap={};
 var __limajePeriodoCerradoMap={};
@@ -2348,6 +2350,7 @@ async function limajeResetSistemaConfigurador(){
   DB.set('auditLog',[]);
   DB.set('workers',[]);
   DB.set('workerPayments',[]);
+  DB.set('workerMonthLedger',[]);
   DB.set('compras',[]);
   DB.set('gastosOperativosMes',{});
   DB.set('app_prefs',DB.get('app_prefs',{}));
@@ -3528,6 +3531,7 @@ function renderCartera(){
       <td><span class="badge ${c.estado==='pagado'?'badge-green':c.estado==='parcial'?'badge-amber':'badge-purple'}">${c.estado}</span></td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
         ${c.estado!=='pagado'?`<button class="btn btn-sm btn-success" onclick="openAbono('${c.id}')">💵 Abono</button>`:''}
+        <button class="btn btn-sm" onclick="generarCompromisoPagoPDF('${c.id}')">📄 Compromiso</button>
         <button class="btn btn-sm btn-secondary" onclick="verDetalleCartera('${c.id}')">Ver</button>
         ${canMarkCarteraPaid()&&c.estado!=='pagado'?`<button class="btn btn-sm btn-amber" onclick="marcarPagado('${c.id}')">✅ Marcar pagado</button>`:''}
       </td>
@@ -3565,6 +3569,7 @@ function registrarAbono(id){
   DB.set('movements',mvs);
   closeModal();renderCartera();renderDashboard();
   alert2(`Abono de ${fmt(monto)} registrado ✅`);
+  void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
 }
 function marcarPagado(id){
   if(!canMarkCarteraPaid()) return alert2('Sin permiso','error');
@@ -3587,6 +3592,7 @@ function marcarPagado(id){
   DB.set('cartera',cartera);
   renderCartera();renderCaja();renderDashboard();
   alert2('Crédito marcado como pagado ✅');
+  void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
 }
 function verDetalleCartera(id){
   const c=getCartera().find(x=>x.id==id);if(!c)return;
@@ -3605,6 +3611,7 @@ function verDetalleCartera(id){
     <table><thead><tr><th>Fecha</th><th>Monto</th><th>Pago</th><th>Nota</th></tr></thead><tbody>${hist}</tbody></table>`:'<p style="color:var(--text2);font-size:13px;margin-top:10px;">Sin abonos registrados</p>'}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+      <button class="btn" onclick="generarCompromisoPagoPDF('${c.id}')">📄 Compromiso de pago</button>
       ${c.estado!=='pagado'?`<button class="btn btn-success" onclick="closeModal();openAbono('${c.id}')">💵 Registrar Abono</button>`:''}
     </div>`);
 }
@@ -4293,20 +4300,61 @@ function renderAuditoria(){
 // ============================================================
 function renderTrabajadores(){
   const workers=getWorkers();
+  const monthKey=(today()||'').slice(0,7);
   document.getElementById('workersTable').innerHTML=workers.length?`<table>
-    <thead><tr><th>Nombre</th><th>Puesto</th><th>Salario</th><th>Período</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <thead><tr><th>Nombre</th><th>Puesto</th><th>Salario</th><th>Período</th><th>Mes actual</th><th>Estado</th><th>Acciones</th></tr></thead>
     <tbody>${workers.map(w=>`<tr>
       <td><strong>${w.nombre||'—'}</strong></td>
       <td>${w.puesto||'—'}</td>
       <td>${fmt(w.salario||0)}</td>
       <td><span class="badge ${w.periodo==='diario'?'badge-green':w.periodo==='semanal'?'badge-amber':'badge-blue'}">${w.periodo==='diario'?'Diario':w.periodo==='semanal'?'Semanal':'Mensual'}</span></td>
+      <td>${workerMonthResumenHtml(w,monthKey)}</td>
       <td>${w.activo!==false?'<span class="badge badge-green">Activo</span>':'<span class="badge badge-red">Inactivo</span>'}</td>
-      <td><button class="btn btn-sm btn-secondary" onclick="openEditWorker(${w.id})">✏️</button> <button class="btn btn-sm btn-success" onclick="openPayWorker(${w.id})">💵 Pagar</button> ${w.activo!==false?`<button class="btn btn-sm btn-danger" onclick="deleteWorker(${w.id})">✕</button>`:''}</td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="openEditWorker(${w.id})">✏️</button>
+        <button class="btn btn-sm btn-amber" onclick="openAdvanceWorker(${w.id})">💸 Adelanto</button>
+        <button class="btn btn-sm btn-success" onclick="openLiquidarWorkerMonth(${w.id})">✅ Liquidar mes</button>
+        <button class="btn btn-sm btn-success" onclick="openPayWorker(${w.id})">💵 Pago libre</button>
+        ${w.activo!==false?`<button class="btn btn-sm btn-danger" onclick="deleteWorker(${w.id})">✕</button>`:''}
+      </td>
     </tr>`).join('')}</tbody>
   </table>`:'<p style="color:var(--text2);padding:20px">No hay trabajadores registrados. Use "Agregar trabajador" para comenzar.</p>';
   const paySel=document.getElementById('workerPaymentWorker');
   paySel.innerHTML='<option value="">Todos los trabajadores</option>'+workers.filter(w=>w.activo!==false).map(w=>`<option value="${w.id}">${w.nombre}</option>`).join('');
   renderWorkerPayments();
+}
+function workerMonthKey(v){ return String(v||today()).slice(0,7); }
+function workerGetOrCreateLedger(worker,monthKey){
+  var list=getWorkerMonthLedger();
+  var idx=list.findIndex(function(x){ return String(x.workerId)===String(worker.id) && x.monthKey===monthKey; });
+  if(idx>=0) return { list:list, idx:idx, row:list[idx] };
+  var row={ id:Date.now()+Math.floor(Math.random()*1e6), workerId:worker.id, workerName:worker.nombre||'', monthKey:monthKey, montoObjetivo:Number(worker.salario)||0, cerrado:false, createdAt:Date.now() };
+  list.push(row);
+  DB.set('workerMonthLedger',list);
+  return { list:list, idx:list.length-1, row:row };
+}
+function workerCalcMonth(workerId,monthKey){
+  var w=getWorkers().find(function(x){ return String(x.id)===String(workerId); });
+  var ledger=getWorkerMonthLedger().find(function(x){ return String(x.workerId)===String(workerId) && x.monthKey===monthKey; });
+  var objetivo=Number(ledger&&ledger.montoObjetivo);
+  if(!(objetivo>0)) objetivo=Number(w&&w.salario)||0;
+  var pays=getWorkerPayments().filter(function(p){ return String(p.workerId)===String(workerId) && workerMonthKey(p.date||p.monthKey)===monthKey; });
+  var adelantos=pays.filter(function(p){ return p.tipo==='adelanto'; }).reduce(function(s,p){ return s+(Number(p.monto)||0); },0);
+  var liquidado=pays.filter(function(p){ return p.tipo==='liquidacion'; }).reduce(function(s,p){ return s+(Number(p.monto)||0); },0);
+  var pagosLibres=pays.filter(function(p){ return !p.tipo||p.tipo==='pago_libre'; }).reduce(function(s,p){ return s+(Number(p.monto)||0); },0);
+  var pagado=adelantos+liquidado;
+  var saldo=Math.max(0, objetivo-pagado);
+  return { ledger:ledger||null, objetivo:objetivo, adelantos:adelantos, liquidado:liquidado, pagosLibres:pagosLibres, pagado:pagado, saldo:saldo };
+}
+function workerMonthResumenHtml(worker,monthKey){
+  var c=workerCalcMonth(worker.id,monthKey);
+  var state=(c.ledger&&c.ledger.cerrado)?'<span class="badge badge-blue">Cerrado</span>':'<span class="badge badge-amber">Abierto</span>';
+  return '<div style="font-size:11px;line-height:1.35;">'+
+    '<div><strong>'+monthKey+'</strong> '+state+'</div>'+
+    '<div>Meta: '+fmt(c.objetivo)+'</div>'+
+    '<div>Adelantos: <span class="monto-egreso">'+fmt(c.adelantos)+'</span></div>'+
+    '<div>Saldo: <strong>'+(c.saldo>0?fmt(c.saldo):'Q 0.00')+'</strong></div>'+
+  '</div>';
 }
 function openAddWorker(){
   showModal(`<h2>➕ Agregar trabajador</h2>
@@ -4377,9 +4425,9 @@ function openPayWorker(id){
     <div class="form-group"><label>Período pagado (opcional)</label><input type="text" id="payPeriod" placeholder="ej: Semana 1-7 Mar 2025"></div>
     <div class="form-group"><label>Forma de pago</label><select id="payForma"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select></div>
     <div id="payError" class="alert alert-error" style="display:none;"></div>
-    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="submitPayWorker(${id})">Registrar pago</button></div>`);
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="submitPayWorker(${id},'pago_libre')">Registrar pago</button></div>`);
 }
-function submitPayWorker(workerId){
+function submitPayWorker(workerId,tipoPago){
   const w=getWorkers().find(x=>x.id===workerId); if(!w) return;
   const monto=parseFloat(document.getElementById('payAmount').value)||0;
   const date=(document.getElementById('payDate').value||'').trim()||today();
@@ -4390,13 +4438,56 @@ function submitPayWorker(workerId){
   const payments=getWorkerPayments();
   const payId=nextMovementId();
   const payTs=nowTs();
-  payments.unshift({id:payId,workerId,workerName:w.nombre,monto,date,period,forma,registradoPor:(currentUser&&currentUser.username)});
+  var monthKey=workerMonthKey(date);
+  payments.unshift({id:payId,workerId,workerName:w.nombre,monto,date,period,forma,monthKey,tipo:(tipoPago||'pago_libre'),registradoPor:(currentUser&&currentUser.username)});
   DB.set('workerPayments',payments);
   const mvs=getMovements();
-  mvs.push({id:payId,type:'egreso',ts:payTs,date,total:monto,desc:'Sueldo — '+w.nombre+(period?' ('+period+')':''),categ:'Sueldos',vendedor:(currentUser&&currentUser.username)});
+  var pref=(tipoPago==='adelanto'?'Adelanto':'Sueldo');
+  if(tipoPago==='liquidacion') pref='Liquidación';
+  mvs.push({id:payId,type:'egreso',ts:payTs,date,total:monto,desc:pref+' — '+w.nombre+(period?' ('+period+')':''),categ:'Sueldos',vendedor:(currentUser&&currentUser.username),meta:{workerId:workerId,monthKey:monthKey,tipo:(tipoPago||'pago_libre')}});
   DB.set('movements',mvs);
-  logAudit('pago_trabajador',w.nombre+' — '+fmt(monto)+' — '+date,'trabajadores',workerId);
+  if(tipoPago==='adelanto' || tipoPago==='liquidacion'){
+    var gl=workerGetOrCreateLedger(w,monthKey);
+    if(tipoPago==='liquidacion'){
+      gl.row.cerrado=true;
+      gl.row.closedAt=Date.now();
+      gl.row.closedBy=(currentUser&&currentUser.username)||'';
+      gl.list[gl.idx]=gl.row;
+      DB.set('workerMonthLedger',gl.list);
+    }
+  }
+  logAudit('pago_trabajador',w.nombre+' — '+fmt(monto)+' — '+date+' ['+(tipoPago||'pago_libre')+']','trabajadores',workerId);
   closeModal(); renderTrabajadores(); alert2('Pago registrado y egreso creado en Caja','success');
+  void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
+}
+function openAdvanceWorker(id){
+  const w=getWorkers().find(x=>x.id===id); if(!w) return;
+  const mk=workerMonthKey(today());
+  const c=workerCalcMonth(id,mk);
+  if(c.ledger&&c.ledger.cerrado) return alert2('Este mes ya está cerrado para '+w.nombre+'.','error');
+  showModal(`<h2>💸 Adelanto — ${(w.nombre||'').replace(/"/g,'&quot;')}</h2>
+    <p style="color:var(--text2);margin-bottom:12px;">Mes ${mk} · Meta: <strong>${fmt(c.objetivo)}</strong> · Adelantado: <strong class="monto-egreso">${fmt(c.adelantos)}</strong> · Saldo: <strong>${fmt(c.saldo)}</strong>.</p>
+    <div class="form-group"><label>Monto adelanto (Q)</label><input type="number" id="payAmount" min="0" step="0.01" value="${c.saldo>0?c.saldo:0}"></div>
+    <div class="form-group"><label>Fecha</label><input type="date" id="payDate" value="${today()}"></div>
+    <div class="form-group"><label>Período / nota (opcional)</label><input type="text" id="payPeriod" placeholder="Adelanto mes ${mk}"></div>
+    <div class="form-group"><label>Forma de pago</label><select id="payForma"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select></div>
+    <div id="payError" class="alert alert-error" style="display:none;"></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-amber" onclick="submitPayWorker(${id},'adelanto')">Registrar adelanto</button></div>`);
+}
+function openLiquidarWorkerMonth(id){
+  const w=getWorkers().find(x=>x.id===id); if(!w) return;
+  const mk=workerMonthKey(today());
+  const c=workerCalcMonth(id,mk);
+  if(c.ledger&&c.ledger.cerrado) return alert2('Este mes ya está liquidado/cerrado para '+w.nombre+'.','error');
+  if(c.saldo<=0) return alert2('No hay saldo pendiente para liquidar este mes.','success');
+  showModal(`<h2>✅ Liquidar mes — ${(w.nombre||'').replace(/"/g,'&quot;')}</h2>
+    <p style="color:var(--text2);margin-bottom:12px;">Mes ${mk} · Meta ${fmt(c.objetivo)} · Adelantos ${fmt(c.adelantos)} · <strong>Saldo a pagar ${fmt(c.saldo)}</strong>.</p>
+    <div class="form-group"><label>Monto liquidación (Q)</label><input type="number" id="payAmount" min="0" step="0.01" value="${c.saldo}"></div>
+    <div class="form-group"><label>Fecha de pago</label><input type="date" id="payDate" value="${today()}"></div>
+    <div class="form-group"><label>Período</label><input type="text" id="payPeriod" value="Liquidación ${mk}"></div>
+    <div class="form-group"><label>Forma de pago</label><select id="payForma"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option></select></div>
+    <div id="payError" class="alert alert-error" style="display:none;"></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="submitPayWorker(${id},'liquidacion')">Pagar restante y cerrar mes</button></div>`);
 }
 function renderWorkerPayments(){
   let list=getWorkerPayments();
@@ -4410,8 +4501,8 @@ function renderWorkerPayments(){
   const workers=getWorkers();
   const name=(id)=>{var w=workers.find(function(x){return x.id===id;});return w?(w.nombre):id;};
   document.getElementById('workerPaymentsTable').innerHTML=list.length?`<table>
-    <thead><tr><th>Fecha</th><th>Trabajador</th><th>Monto</th><th>Período</th><th>Forma</th><th>Registrado por</th></tr></thead>
-    <tbody>${list.map(p=>`<tr><td>${p.date}</td><td>${p.workerName||name(p.workerId)}</td><td class="monto-egreso">${fmt(p.monto)}</td><td>${p.period||'—'}</td><td>${p.forma||'—'}</td><td>${p.registradoPor||'—'}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>Fecha</th><th>Trabajador</th><th>Tipo</th><th>Monto</th><th>Mes</th><th>Período</th><th>Forma</th><th>Registrado por</th></tr></thead>
+    <tbody>${list.map(p=>`<tr><td>${p.date}</td><td>${p.workerName||name(p.workerId)}</td><td><span class="badge ${p.tipo==='adelanto'?'badge-amber':p.tipo==='liquidacion'?'badge-green':'badge-teal'}">${p.tipo||'pago_libre'}</span></td><td class="monto-egreso">${fmt(p.monto)}</td><td>${p.monthKey||workerMonthKey(p.date)}</td><td>${p.period||'—'}</td><td>${p.forma||'—'}</td><td>${p.registradoPor||'—'}</td></tr>`).join('')}</tbody>
   </table>`:'<p style="color:var(--text2);padding:20px">No hay pagos registrados con los filtros seleccionados.</p>';
 }
 
@@ -5089,7 +5180,7 @@ function pdfDateParts(){
 }
 function pdfSuggestedFilename(tipo, refId){
   var p=pdfDateParts();
-  var slug={cotizacion:'Cotizacion',venta:'ReciboVenta'}[tipo]||'Documento';
+  var slug={cotizacion:'Cotizacion',venta:'ReciboVenta',compromiso:'CompromisoPago'}[tipo]||'Documento';
   return 'SAN_JUAN_'+p.ym+'_'+slug+'_'+refId+'.pdf';
 }
 var PDF_EMPRESA_NOMBRE=LIMAJE_BRAND_COMPANY_NAME;
@@ -5180,22 +5271,32 @@ function pdfRegistrarDocumento(tipo, titulo, nombreArchivo, refId, extra){
 function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   var M=14, W=182, y=11;
   var headerH=44;
-  pdfBrandStripe(doc,M,y,headerH);
-  doc.setFillColor(250,250,250);
-  doc.setDrawColor(70,70,70);
-  doc.setLineWidth(0.4);
-  doc.rect(M+5,y,W-5,headerH,'FD');
-  pdfDrawLogo(doc,logoDataUrl,M+10,y+7,78,28);
+  // Marco principal y estilo moderno (negro/gris)
+  doc.setDrawColor(175,175,175);
+  doc.setLineWidth(0.25);
+  doc.rect(M,y,W,278,'S');
+  // Cabecera decorativa superior
+  doc.setFillColor(20,20,20);
+  doc.triangle(M,y,M+48,y,M+35,y+19,'F');
+  doc.setFillColor(95,95,95);
+  doc.rect(M+48,y,W-48,6,'F');
+  // Pie decorativo inferior
+  doc.setFillColor(20,20,20);
+  doc.triangle(M+W-70,289,M+W,289,M+W,278,'F');
+  doc.setFillColor(95,95,95);
+  doc.rect(M,286,W-70,3,'F');
+
+  pdfDrawLogo(doc,logoDataUrl,M+6,y+6,34,14);
   var tx=M+W-7;
-  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
+  doc.setTextColor(25,25,25);
   doc.setFont('helvetica','bold');
-  doc.setFontSize(17);
+  doc.setFontSize(18);
   doc.text('COTIZACIÓN',tx,y+12.5,{align:'right'});
   doc.setFont('helvetica','normal');
-  doc.setFontSize(8.4);
-  doc.setTextColor(40,40,42);
+  doc.setFontSize(8.2);
+  doc.setTextColor(80,80,80);
   doc.text(PDF_EMPRESA_NOMBRE,tx,y+20.5,{align:'right'});
-  doc.setTextColor(PDF_BRAND_G[0],PDF_BRAND_G[1],PDF_BRAND_G[2]);
+  doc.setTextColor(60,60,60);
   doc.text(PDF_EMPRESA_EMAIL,tx,y+27,{align:'right'});
   doc.setTextColor(55,65,60);
   doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+33,{align:'right'});
@@ -5206,11 +5307,11 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
 
   // Badge de referencia (moderno y visible)
   doc.setFillColor(245,245,245);
-  doc.setDrawColor(190,190,190);
+  doc.setDrawColor(170,170,170);
   doc.roundedRect(M+W-62,y-1,62,10,2,2,'FD');
   doc.setFont('helvetica','bold');
   doc.setFontSize(9);
-  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
+  doc.setTextColor(20,20,20);
   doc.text('Ref. #'+q.id,M+W-4,y+5,{align:'right'});
 
   doc.setTextColor(30,30,30);
@@ -5224,10 +5325,10 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.text('Elaborado por: '+cotizElaboradoText(q),M,y+3);
   y+=8;
   doc.setFillColor(255,255,255);
-  doc.setDrawColor(70,70,70);
+  doc.setDrawColor(120,120,120);
   doc.setLineWidth(0.35);
   doc.roundedRect(M,y,W,24,2,2,'S');
-  doc.setFillColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setFillColor(20,20,20);
   doc.roundedRect(M,y,W,6,2,2,'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold');
@@ -5245,8 +5346,8 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   var subPrev=q.subtotal!=null?q.subtotal:cotizSubtotal();
   var totPrev=q.total!=null?q.total:Math.max(0,subPrev-(q.descuento||0));
   var cardY=y, cardH=18, leftW=104, gap=4, rightW=W-leftW-gap;
-  doc.setDrawColor(205,205,205);
-  doc.setFillColor(248,248,248);
+  doc.setDrawColor(195,195,195);
+  doc.setFillColor(249,249,249);
   doc.roundedRect(M,cardY,leftW,cardH,2,2,'FD');
   doc.setFillColor(248,248,248);
   doc.setDrawColor(205,205,205);
@@ -5255,7 +5356,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.setFontSize(8.2);
   doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.text('Condiciones',M+3,cardY+4.5);
-  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
+  doc.setTextColor(45,45,45);
   doc.text('Resumen',M+leftW+gap+3,cardY+4.5);
   doc.setFont('helvetica','normal');
   doc.setFontSize(7.8);
@@ -5265,7 +5366,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
   doc.text('Subtotal: Q '+Number(subPrev).toFixed(2),M+leftW+gap+3,cardY+9.5);
   doc.setFont('helvetica','bold');
-  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
+  doc.setTextColor(20,20,20);
   doc.text('Total: Q '+Number(totPrev).toFixed(2),M+leftW+gap+3,cardY+14);
   y+=cardH+6;
   if(q.nota){
@@ -5285,8 +5386,8 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   }
   doc.setTextColor(0,0,0);
   doc.setFontSize(9);
-  doc.setFillColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
-  doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setFillColor(20,20,20);
+  doc.setDrawColor(20,20,20);
   doc.roundedRect(M,y,W,8,1.5,1.5,'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold');
@@ -5321,14 +5422,14 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
     row++;
   });
   y+=5;
-  doc.setDrawColor(70,70,70);
+  doc.setDrawColor(110,110,110);
   doc.setLineWidth(0.6);
   doc.line(M,y,M+W,y); y+=7;
   var sub=q.subtotal!=null?q.subtotal:cotizSubtotal();
   var tot=q.total!=null?q.total:Math.max(0,cotizSubtotal()-(q.descuento||0));
   var boxL=M+95;
   doc.setFillColor(248,248,248);
-  doc.setDrawColor(200,200,200);
+  doc.setDrawColor(190,190,190);
   doc.setLineWidth(0.35);
   var boxH=6+6+((q.descuento||0)>0?6:0)+10;
   doc.roundedRect(boxL,y-3,M+W-boxL-2,boxH,2,2,'FD');
@@ -5347,7 +5448,7 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
   }
   doc.setFont('helvetica','bold');
   doc.setFontSize(12.5);
-  doc.setTextColor(PDF_BRAND_R[0],PDF_BRAND_R[1],PDF_BRAND_R[2]);
+  doc.setTextColor(20,20,20);
   doc.text('TOTAL',boxL+4,y+4);
   doc.text('Q '+Number(tot).toFixed(2),M+W-4,y+4,{align:'right'});
   doc.setFontSize(9);
@@ -5397,14 +5498,20 @@ function pdfBuildCotizacionDocument(doc, q, fotoParaPdf, logoDataUrl){
 function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   var M=14, W=182, y=11;
   var headerH=44;
-  pdfBrandStripe(doc,M,y,headerH);
-  doc.setFillColor(248,251,249);
-  doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
-  doc.setLineWidth(0.4);
-  doc.rect(M+5,y,W-5,headerH,'FD');
-  pdfDrawLogo(doc,logoDataUrl,M+10,y+7,78,28);
+  doc.setDrawColor(175,175,175);
+  doc.setLineWidth(0.25);
+  doc.rect(M,y,W,278,'S');
+  doc.setFillColor(20,20,20);
+  doc.triangle(M,y,M+48,y,M+35,y+19,'F');
+  doc.setFillColor(95,95,95);
+  doc.rect(M+48,y,W-48,6,'F');
+  doc.setFillColor(20,20,20);
+  doc.triangle(M+W-70,289,M+W,289,M+W,278,'F');
+  doc.setFillColor(95,95,95);
+  doc.rect(M,286,W-70,3,'F');
+  pdfDrawLogo(doc,logoDataUrl,M+6,y+6,34,14);
   var tx=M+W-7;
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(25,25,25);
   doc.setFont('helvetica','bold');
   doc.setFontSize(15);
   doc.text('COMPROBANTE DE VENTA',tx,y+12.5,{align:'right'});
@@ -5412,18 +5519,18 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   doc.setFontSize(8.4);
   doc.setTextColor(40,40,42);
   doc.text(PDF_EMPRESA_NOMBRE,tx,y+20.5,{align:'right'});
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(60,60,60);
   doc.text(PDF_EMPRESA_EMAIL,tx,y+27,{align:'right'});
   doc.setTextColor(55,65,60);
   doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+33,{align:'right'});
   y+=headerH+7;
   var ds=new Date(mov.ts).toLocaleString('es-GT');
-  doc.setFillColor(238,246,255);
-  doc.setDrawColor(178,205,236);
+  doc.setFillColor(245,245,245);
+  doc.setDrawColor(170,170,170);
   doc.roundedRect(M+W-62,y-1,62,10,2,2,'FD');
   doc.setFont('helvetica','bold');
   doc.setFontSize(9);
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(20,20,20);
   doc.text('Venta #'+mov.id,M+W-4,y+5,{align:'right'});
   doc.setTextColor(40,40,40);
   doc.setFontSize(10);
@@ -5436,8 +5543,8 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   if(mov.nit){ doc.text('NIT: '+mov.nit,M,y+1); y+=6; }
   if(mov.numeroFactura){ doc.text('No. factura / FEL: '+mov.numeroFactura,M,y+1); y+=6; }
   y+=4;
-  doc.setFillColor(33,90,153);
-  doc.setDrawColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setFillColor(20,20,20);
+  doc.setDrawColor(20,20,20);
   doc.roundedRect(M,y,W,8,1.5,1.5,'F');
   doc.setTextColor(255,255,255);
   doc.setFont('helvetica','bold');
@@ -5473,8 +5580,8 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   doc.line(M,y,M+W,y); y+=7;
   var sub=(mov.items||[]).reduce(function(s,i){ return s+ventaItemSubtotalStored(i); },0);
   var boxL=M+98;
-  doc.setFillColor(248,252,249);
-  doc.setDrawColor(178,208,188);
+  doc.setFillColor(248,248,248);
+  doc.setDrawColor(190,190,190);
   doc.setLineWidth(0.35);
   var boxH=6+6+((mov.descuento||0)>0?6:0)+10;
   doc.roundedRect(boxL,y-3,M+W-boxL-2,boxH,2,2,'FD');
@@ -5490,7 +5597,7 @@ function pdfBuildVentaDocument(doc, mov, logoDataUrl){
   }
   doc.setFont('helvetica','bold');
   doc.setFontSize(12);
-  doc.setTextColor(PDF_BRAND_B[0],PDF_BRAND_B[1],PDF_BRAND_B[2]);
+  doc.setTextColor(20,20,20);
   doc.text('TOTAL',boxL+4,y+4);
   doc.text('Q '+Number(mov.total||0).toFixed(2),M+W-4,y+4,{align:'right'});
   y+=10;
@@ -5516,6 +5623,71 @@ function generarReciboVentaPDF(movId){
       alert2('PDF generado ✅ Revise también 📁 Documentos');
       try{ renderDocumentosPage(); }catch(x){}
     }catch(err){ alert2('Error PDF: '+String(err.message||err),'error'); }
+  });
+}
+function generarCompromisoPagoPDF(carteraId){
+  var c=getCartera().find(function(x){ return String(x.id)===String(carteraId); });
+  if(!c) return alert2('Registro de cartera no encontrado','error');
+  var JSPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+  if(!JSPDF) return alert2('jsPDF no cargó. Revise la conexión.','error');
+  pdfLoadLogo(function(logo){
+    try{
+      var doc=new JSPDF({unit:'mm',format:'a4'});
+      var M=14,W=182,y=11;
+      doc.setDrawColor(175,175,175); doc.setLineWidth(0.25); doc.rect(M,y,W,278,'S');
+      doc.setFillColor(20,20,20); doc.triangle(M,y,M+48,y,M+35,y+19,'F');
+      doc.setFillColor(95,95,95); doc.rect(M+48,y,W-48,6,'F');
+      pdfDrawLogo(doc,logo,M+6,y+6,34,14);
+      var tx=M+W-7;
+      doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(20,20,20);
+      doc.text('COMPROMISO DE PAGO',tx,y+13,{align:'right'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.4); doc.setTextColor(70,70,70);
+      doc.text(PDF_EMPRESA_NOMBRE,tx,y+20,{align:'right'});
+      doc.text(PDF_EMPRESA_EMAIL,tx,y+26,{align:'right'});
+      doc.text('Tel. '+PDF_EMPRESA_TEL,tx,y+32,{align:'right'});
+      y+=44;
+
+      doc.setFillColor(245,245,245); doc.setDrawColor(180,180,180); doc.roundedRect(M,y,W,22,2,2,'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
+      doc.text('Cliente: '+String(c.cliente||'—'),M+4,y+7);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(55,55,55);
+      doc.text('Documento: #'+String(c.id||'—')+'  ·  Fecha: '+dateLabel(c.date||today()),M+4,y+13);
+      doc.text('Estado: '+String(c.estado||'pendiente').toUpperCase(),M+4,y+18);
+      y+=30;
+
+      doc.setFillColor(20,20,20); doc.roundedRect(M,y,W,8,1.5,1.5,'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text('Resumen del compromiso',M+4,y+5.5); y+=11;
+      doc.setTextColor(30,30,30); doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      doc.text('Total crédito:',M+4,y); doc.text(fmt(c.total||0),M+W-4,y,{align:'right'}); y+=7;
+      doc.text('Abonado:',M+4,y); doc.text(fmt(c.abonado||0),M+W-4,y,{align:'right'}); y+=7;
+      doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
+      doc.text('Saldo pendiente:',M+4,y); doc.text(fmt(c.saldo||0),M+W-4,y,{align:'right'}); y+=11;
+
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(70,70,70);
+      var tLines=doc.splitTextToSize('El cliente se compromete a cancelar el saldo pendiente conforme al acuerdo entre las partes. Este documento sirve como constancia interna de compromiso de pago.',W-8);
+      doc.text(tLines,M+4,y); y+=tLines.length*4.5+14;
+
+      if(y>250){ doc.addPage(); y=30; }
+      doc.setDrawColor(120,120,120);
+      doc.line(M+8,y,M+82,y); doc.line(M+100,y,M+174,y);
+      doc.setFontSize(8); doc.setTextColor(90,90,90);
+      doc.text('Firma cliente',M+45,y+4,{align:'center'});
+      doc.text('Autorización empresa',M+137,y+4,{align:'center'});
+
+      doc.setFontSize(7.2); doc.setTextColor(95,100,98);
+      var foot1=PDF_EMPRESA_NOMBRE+'  ·  '+PDF_EMPRESA_EMAIL+'  ·  Tel. '+PDF_EMPRESA_TEL;
+      doc.text(foot1,M+W/2,283,{align:'center'});
+
+      var fn=pdfSuggestedFilename('compromiso',c.id||Date.now());
+      doc.save(fn);
+      pdfRegistrarDocumento('compromiso','Compromiso de pago #'+(c.id||''),fn,c.id,{ cliente:c.cliente, total:c.saldo });
+      alert2('PDF de compromiso generado ✅');
+      try{ renderDocumentosPage(); }catch(x){}
+      void (async function(){ try{ await flushPersistQueue(); }catch(e){} })();
+    }catch(err){
+      alert2('Error PDF compromiso: '+String(err.message||err),'error');
+    }
   });
 }
 function renderDocumentosPage(){
@@ -5549,7 +5721,7 @@ function renderDocumentosPage(){
     var label=pm[0]+' — '+mesNom[parseInt(pm[1],10)];
     return '<div style="margin-bottom:20px;"><div style="font-weight:700;color:var(--teal-dk);border-bottom:2px solid var(--border);padding-bottom:8px;margin-bottom:10px;">📂 '+label+'</div><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Nombre de archivo sugerido</th></tr></thead><tbody>'+
       byMonth[k].map(function(r){
-        var tipoLab=r.tipo==='cotizacion'?'Cotización':'Recibo venta';
+        var tipoLab=r.tipo==='cotizacion'?'Cotización':(r.tipo==='compromiso'?'Compromiso pago':'Recibo venta');
         var det=r.titulo||'—';
         if(r.extra&&r.extra.cliente) det+=' · '+(r.extra.cliente||'');
         return '<tr><td style="font-size:11px;white-space:nowrap;">'+fmtDt(r.ts)+'</td><td>'+tipoLab+'</td><td style="font-size:12px;">'+escapeHtmlLot(det)+'</td><td style="font-size:11px;font-family:ui-monospace,monospace;">'+escapeHtmlLot(r.nombreArchivo)+'</td></tr>';
@@ -6118,6 +6290,7 @@ function exportarJSON(){
     auditLog:    DB.get('auditLog',[]),
     workers:     DB.get('workers',[]),
     workerPayments: DB.get('workerPayments',[]),
+    workerMonthLedger: DB.get('workerMonthLedger',[]),
     compras: DB.get('compras',[]),
     gastosOperativosMes: DB.get('gastosOperativosMes',{}),
   };
@@ -6199,6 +6372,7 @@ function importarJSON(event){
       if(data.auditLog)    DB.set('auditLog',    data.auditLog);
       if(data.workers)     DB.set('workers',     data.workers);
       if(data.workerPayments) DB.set('workerPayments', data.workerPayments);
+      if(data.workerMonthLedger) DB.set('workerMonthLedger', data.workerMonthLedger);
       DB.set('compras', data.compras||[]);
       DB.set('gastosOperativosMes', data.gastosOperativosMes||{});
       DB.set('schemaVersion', SCHEMA_VERSION);
