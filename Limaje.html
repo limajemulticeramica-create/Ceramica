@@ -1806,7 +1806,13 @@ async function cotizConfiguradorPurgeAllCloud(){
   if(!confirm('¿Eliminar TODAS las cotizaciones en Supabase y vaciar la lista en este equipo?\n\nNo deshace ventas ya registradas ni borra movimientos. Sí elimina reservas y colas de abastecimiento ligadas a cotizaciones.')) return;
   if(!confirm('Segunda confirmación: se borrarán todas las filas de cotizaciones en el servidor.')) return;
   try{
-    var out=await LM.purgeAllCotizacionesConfiguradorRpc();
+    var out=null;
+    if(typeof LM.resetCotizacionesSequenceRpc==='function'){
+      try{ out=await LM.resetCotizacionesSequenceRpc(); }catch(e0){ console.warn(e0); }
+    }
+    if(!out||out.ok===false){
+      out=await LM.purgeAllCotizacionesConfiguradorRpc();
+    }
     if(out&&out.ok===false){ alert2(String(out.error||'Error'),'error'); return; }
     DB.set('cotizaciones',[]);
     try{ await persistFullLimajeState(); }catch(e){ console.warn(e); }
@@ -1818,7 +1824,7 @@ async function cotizConfiguradorPurgeAllCloud(){
   }catch(e){
     console.error(e);
     var msg=String((e.message!=null?e.message:e)||e);
-    if(/configurador|solo el rol/i.test(msg)) msg='Solo el rol configurador puede ejecutar esta acción en el servidor. Ejecute el SQL nuevo (limaje_configurador_purge_all_cotizaciones) en Supabase si falta.';
+    if(/configurador|solo el rol/i.test(msg)) msg='Solo el rol configurador puede ejecutar esta acción en el servidor. Ejecute migration-reset-cotizaciones-sequence-rpc.sql (y purge) en Supabase si falta.';
     alert2(msg,'error');
   }
 }
@@ -2454,10 +2460,13 @@ async function limajeReiniciarNumeracionDocumentosConfigurador(){
   try{
     if(window.__limajeSupabase&&window.__limajeSqlCore){
       try{
-        if(typeof window.__limajeSqlCore.resetCotizacionNumeracionRpc==='function'){
-          await window.__limajeSqlCore.resetCotizacionNumeracionRpc();
+        var LMc=window.__limajeSqlCore;
+        if(typeof LMc.resetCotizacionesSequenceRpc==='function'){
+          await LMc.resetCotizacionesSequenceRpc();
+        }else if(typeof LMc.resetCotizacionNumeracionRpc==='function'){
+          await LMc.resetCotizacionNumeracionRpc();
         }else{
-          await window.__limajeSqlCore.purgeAllCotizacionesConfiguradorRpc();
+          await LMc.purgeAllCotizacionesConfiguradorRpc();
         }
       }catch(eRpc){
         cloudOk=false;
@@ -2511,7 +2520,7 @@ async function limajeResetSistemaConfigurador(){
   if(!confirm('⚠ RESET COMPLETO\n\nSe borrarán TODOS los datos de este equipo (productos, inventario/lotes, movimientos, cartera, compras, PDFs, auditoría, trabajadores, etc.).\n\nAdemás: si hay conexión, se vaciarán las cotizaciones en la nube.\n\n¿Desea continuar?')) return;
   if(!confirm('Segunda confirmación: ¿Seguro que desea resetear completamente el sistema?')) return;
 
-  // 1) Intentar vaciar cotizaciones en servidor
+  // 1) Vaciar cotizaciones en servidor y reiniciar limaje_cotizacion_num_seq (TRUNCATE + setval vía RPC)
   var cloudPurgeRequired=!!window.__limajeSupabase;
   var cloudPurgeOk=!cloudPurgeRequired;
   try{
@@ -2520,13 +2529,24 @@ async function limajeResetSistemaConfigurador(){
       var sb=window.__limajeSupabase;
       var purged=false;
       try{
-        var out=await LM.purgeAllCotizacionesConfiguradorRpc();
-        if(out&&out.ok===false){ console.warn('purge cotizaciones rpc',out.error||out); }
-        else purged=true;
-      }catch(eRpc){
-        console.warn('purge cotizaciones rpc fail',eRpc);
+        if(typeof LM.resetCotizacionesSequenceRpc==='function'){
+          var outSeq=await LM.resetCotizacionesSequenceRpc();
+          if(outSeq&&outSeq.ok===false) console.warn('reset_cotizaciones_sequence rpc',outSeq.error||outSeq);
+          else purged=true;
+        }
+      }catch(eSeq){
+        console.warn('reset_cotizaciones_sequence rpc fail',eSeq);
       }
-      // Fallback: borrar directo (si el RPC no existe / no borró)
+      if(!purged){
+        try{
+          var out=await LM.purgeAllCotizacionesConfiguradorRpc();
+          if(out&&out.ok===false){ console.warn('purge cotizaciones rpc',out.error||out); }
+          else purged=true;
+        }catch(eRpc){
+          console.warn('purge cotizaciones rpc fail',eRpc);
+        }
+      }
+      // Fallback: borrar por API (no reinicia secuencia; último recurso si faltan RPCs en Supabase)
       if(!purged){
         try{
           var d1=await sb.from('limaje_demanda_linea').delete().not('cotizacion_id','is',null);
@@ -2620,6 +2640,13 @@ async function limajeResetSistemaConfigurador(){
   try{
     // recargar también desde SQL (para que el historial nube quede vacío en pantalla)
     try{ await limajeRefreshCotizacionesFromSql(); }catch(xSql){}
+    try{
+      var ht=document.getElementById('cotHistTable');
+      if(ht) ht.innerHTML='';
+      var hr=document.getElementById('cotHistResumen');
+      if(hr) hr.textContent='';
+      void cotHistLoad(true);
+    }catch(eHist){ console.warn(eHist); }
     renderDashboard(); renderProducts(); renderInventario(); renderCaja(); renderMovimientos(); renderCartera(); renderDocumentosPage(); renderAuditoria(); renderTrabajadores(); renderCotizacionesList();
   }catch(e4){}
   alert2((kvCloudOk||kvFallbackOk)?'Sistema reseteado ✅. Se cerrará sesión para aplicar limpieza total.':'Reseteado localmente. Hubo problema de nube; vuelva a intentar con buena conexión.', 'success');
