@@ -1100,14 +1100,14 @@ window.LIMAJE_SUPABASE_ANON_KEY = window.LIMAJE_SUPABASE_ANON_KEY || '';
 </div>
 <div id="printArea" style="display:none;"></div>
 
-<script src="database/supabaseClient.js"></script>
-<script src="utils/calculos.js"></script>
-<script src="services/reportes.js"></script>
-<script src="scripts/limaje-app-core.js"></script>
+<script src="limaje-p1.js"></script>
+<script src="limaje-p2.js"></script>
+<script src="limaje-p3.js"></script>
+<script src="limaje-p4.js"></script>
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    var swUrl=new URL('sw.js?v=2026-04-08-01',window.location.href).href;
+    var swUrl=new URL('sw.js?v=2026-04-10-02',window.location.href).href;
     var scopeUrl=new URL('./',window.location.href).href;
     navigator.serviceWorker.register(swUrl,{ scope:scopeUrl }).then(function(reg){
       console.log('LIMAJE PWA: service worker OK',reg.scope);
