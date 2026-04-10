@@ -1,0 +1,6 @@
+# Cloudflare Pages — cabeceras para PWA y service worker
+/manifest.json
+  Content-Type: application/manifest+json; charset=utf-8
+
+/sw.js
+  Cache-Control: no-cache

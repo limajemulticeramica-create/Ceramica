@@ -170,14 +170,6 @@
     return r.data;
   };
 
-  /** TRUNCATE limaje_cotizaciones + reinicio explícito de limaje_cotizacion_num_seq (solo configurador). */
-  L.resetCotizacionesSequenceRpc = async function () {
-    var sb = L.getSb();
-    var r = await sb.rpc('reset_cotizaciones_sequence');
-    if (r.error) throw r.error;
-    return r.data;
-  };
-
   L.abastecimientoCubrirRpc = async function (productId, locationCode) {
     var sb = L.getSb();
     var r = await sb.rpc('limaje_abastecimiento_intentar_cubrir', {
