@@ -2,6 +2,10 @@
 [build]
   publish = "."
 
+[functions]
+  directory = "functions"
+  node_bundler = "esbuild"
+
 # Raíz = misma app (URL limpia / y PWA start_url compatible)
 [[redirects]]
   from = "/"

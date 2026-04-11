@@ -2593,7 +2593,7 @@ function showReceipt(mov){
   showModal(`<h2>✅ Venta Registrada</h2>
     ${buildReceiptHTML(mov,'ticket')}
     <div style="background:var(--teal-xs);border-radius:8px;padding:9px 12px;margin:10px 0;font-size:12px;color:var(--text2);">
-      💡 <strong>Imprimir como Ticket (57mm):</strong> Use impresora térmica o, en la ventana de impresión del navegador, seleccione tamaño personalizado <strong>57mm × auto</strong> (o un ancho cercano) y márgenes <strong>Ninguno/Sin márgenes</strong>.<br>
+      💡 <strong>Imprimir como Ticket (48mm):</strong> Use impresora térmica o, en la ventana de impresión del navegador, seleccione tamaño personalizado <strong>48mm × auto</strong> (o un ancho cercano) y márgenes <strong>Ninguno/Sin márgenes</strong>.<br>
       <strong>Imprimir A4:</strong> Para carta/oficio normal, use el botón A4 y configure tamaño Carta/A4 en el diálogo de impresión.<br>
       <strong>Guardar PDF:</strong> En el diálogo de impresión, elija <em>Destino → Guardar como PDF</em>.
     </div>
@@ -2601,7 +2601,7 @@ function showReceipt(mov){
       <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
       <button class="btn btn-success" onclick="generarReciboVentaPDF(${rid})">📄 PDF</button>
       <button class="btn btn-secondary" onclick="printReceipt(${rid},'a4')">🖨 Imprimir A4</button>
-      <button class="btn" onclick="printReceipt(${rid},'ticket')">🖨 Ticket 57mm</button>
+      <button class="btn" onclick="printReceipt(${rid},'ticket')">🖨 Ticket 48mm</button>
     </div>`);
 }
 function buildReceiptHTML(mov,mode){
@@ -2639,7 +2639,7 @@ function buildReceiptHTML(mov,mode){
       <polygon points="100,2 108,14 100,26 92,14" fill="#1565c0"/><text x="100" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">E</text>
     </svg>
     </div>`;
-  return `<div class="receipt" style="font-family:'Courier New',monospace;font-size:${isA4?'12pt':'8pt'};background:#fff;color:#000;max-width:${isA4?'160mm':'54mm'};margin:0 auto;padding:${isA4?'8mm':'2mm 0'};">
+  return `<div class="receipt" style="font-family:'Courier New',monospace;font-size:${isA4?'12pt':'8pt'};background:#fff;color:#000;max-width:${isA4?'160mm':'45mm'};margin:0 auto;padding:${isA4?'8mm':'2mm 0'};">
     ${receiptLogo}
     <div style="text-align:center;font-size:${isA4?'10pt':'8pt'};color:#555;margin-bottom:5px;">Comprobante de Venta</div>
     <hr style="border:1px dashed #999;margin:4px 0;">
@@ -2669,14 +2669,14 @@ function printReceipt(movId,mode){
   const id=parseInt(movId);
   const mov=getMovements().find(m=>m.id===id||m.id===movId||String(m.id)===String(movId));if(!mov)return;
   const pa=document.getElementById('printArea');
-  // Modo: 'ticket' (57mm) o 'a4'
+  // Modo: 'ticket' (48mm) o 'a4'
   const printMode=mode||'ticket';
   pa.className='print-'+printMode;
   // Estilos inline para que @page funcione correctamente
   pa.setAttribute('data-mode',printMode);
   pa.innerHTML=`
     <style>
-      @page{ size:${printMode==='ticket'?'57mm auto':'A4 portrait'}; margin:${printMode==='ticket'?'0':'10mm 12mm'}; }
+      @page{ size:${printMode==='ticket'?'48mm auto':'A4 portrait'}; margin:${printMode==='ticket'?'0':'10mm 12mm'}; }
       body{ margin:0; }
     </style>
     ${buildReceiptHTML(mov,printMode)}`;
@@ -2694,7 +2694,7 @@ function verRecibo(movId){
       <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
       <button class="btn btn-success" onclick="generarReciboVentaPDF(${mov.id})">📄 Descargar PDF</button>
       <button class="btn btn-secondary" onclick="printReceipt(${mov.id},'a4')">🖨 A4</button>
-      <button class="btn" onclick="printReceipt(${mov.id},'ticket')">🖨 Ticket 57mm</button>
+      <button class="btn" onclick="printReceipt(${mov.id},'ticket')">🖨 Ticket 48mm</button>
     </div>`);
 }
 

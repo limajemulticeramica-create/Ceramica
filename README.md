@@ -1,51 +1,14 @@
-# Multi-cerámica LIMAJE
+# Versión refactorizada
 
-Sistema de gestión (HTML + Supabase). **GitHub + Netlify**.
+La **versión en producción** es la **raíz del repositorio** (`Limaje.html`, `scripts/limaje-app-core.js`, etc.).
 
-## 1. Claves Supabase (login)
+Esta carpeta no duplica el código completo a propósito: mantener dos copias de ~6 000 líneas habría provocado divergencias y errores en despliegue (Netlify / Cloudflare Pages / PWA).
 
-Edite **`limaje-config.js`**: ponga **Project URL** y **anon public** (Supabase → *Project Settings* → *API*).
+## Qué sí cambió en la raíz (refactor incremental)
 
-- Repo **público** en GitHub: no haga *commit* de claves reales; use **repo privado** o edite solo en Netlify tras desplegar.
-- Ese archivo ya viene en el repo con cadenas vacías (no rompe el sitio).
+- JavaScript principal extraído a `scripts/limaje-app-core.js`.
+- Utilidades: `utils/calculos.js`, `services/reportes.js`, `database/supabaseClient.js`.
+- Funciones opcionales en `functions/` para cierres calculados en servidor.
+- Documentación en `documentacion_codigo/`.
 
-## 2. Base de datos
-
-En Supabase → *SQL Editor*, ejecute **todo** `supabase/schema.sql`.
-
-## 3. Imágenes (en la raíz del repo, junto a `Limaje.html`)
-
-Suba **`logo.png`**, **`icon-192.png`** y **`icon-512.png`** en la **misma carpeta** que `Limaje.html` (no hace falta carpeta `assets/`). Opcional: `icon-source.png`.
-
-## Archivos que no deben faltar en GitHub
-
-| Archivo | Para qué |
-|---------|----------|
-| `Limaje.html` | App |
-| `limaje-config.js` | URL y clave Supabase (**si falta, no hay login**) |
-| `logo.png`, `icon-192.png`, `icon-512.png` | Logo y PWA / favicon |
-| `manifest.json`, `sw.js`, `netlify.toml` | Instalar app y Netlify |
-| `index.html` | Redirección opcional |
-| `supabase/schema.sql` | Copiar y ejecutar en Supabase (no corre en Netlify) |
-| `.gitignore` | Evita subir `node_modules` |
-
-## 4. Subir a GitHub
-
-```bash
-git init
-git add .
-git commit -m "LIMAJE"
-git branch -M main
-git remote add origin https://github.com/USUARIO/REPO.git
-git push -u origin main
-```
-
-## 5. Netlify
-
-*Nuevo sitio desde Git* → mismo repositorio → directorio de publicación **`.`** (raíz). El archivo `netlify.toml` ya está configurado.
-
-En Supabase → *Authentication* → *URL configuration*: ponga la URL de Netlify en *Site URL* y *Redirect URLs*.
-
-## Roles (`profiles.role`)
-
-`admin`, `configurador`, `contador`, `vendedor`, `bodeguero`, `auxiliar_bodega`.
+Si en el futuro se desea una **rama o carpeta espejo** completa, se puede generar copiando la raíz con un script de CI; no se recomienda editar manualmente dos árboles paralelos.
